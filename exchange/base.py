@@ -23,6 +23,18 @@ class Exchange(object):
         self.host = host
         self.timeout = 10
 
+    def order(self, symbol, side, type='limit', amount=None, price=None):
+        # TODO(zz) 实现余额不足Exception
+        raise NotImplementedError
+
+    def buy_limit(self, symbol, amount, price):
+        assert amount is not None and price is not None
+        return self.order(symbol, "buy", type="limit", amount=amount, price=price)
+
+    def sell_limit(self, symbol, amount, price):
+        assert amount is not None and price is not None
+        return self.order(symbol, "sell", type="limit", amount=amount, price=price)
+
     def get(self, path, host=None, data=None):
         if host is None:
             url = self.host + path

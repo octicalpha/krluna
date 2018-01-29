@@ -51,6 +51,7 @@ class Account(object):
             self.add(asset)
         else:
             self.assets[coin].avail = amount
+        return self
 
     def set_freeze(self, coin, amount):
         if coin not in self.assets:
@@ -58,6 +59,7 @@ class Account(object):
             self.add(asset)
         else:
             self.assets[coin].freeze = amount
+        return self
 
     def __str__(self):
         a = ' , '.join([str(x) for x in self.assets.values()])

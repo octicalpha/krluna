@@ -53,6 +53,19 @@ class Test(object):
         self.order_manager = OrderManager(self.engine)
         self.accounts = {}
 
+    def _check_and_create_table(self, tablename):
+        sql = '''
+            CREATE TABLE if not EXISTS `%s` (
+              `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+              `coin` varchar(8) DEFAULT NULL,
+              `ab` decimal(8,4) DEFAULT NULL,
+              `ba` decimal(8,4) DEFAULT NULL,
+              `ts` bigint(20) DEFAULT NULL,
+              PRIMARY KEY (`id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+        ''' % tablename
+        self.engine.execute(sql)
+
     def insert(self, table, coin, a, b, ts):
         sql = "insert into " + table + " (coin, ab, ba, ts) values (?, ?, ?, ?)"
         self.engine.execute(sql, (coin, a, b, ts))
@@ -61,6 +74,7 @@ class Test(object):
         self.first_api = self.exchanges.get(first)
         self.second_api = self.exchanges.get(second)
         self.tablename = 'diff_%s_%s' % (first, second)
+        self._check_and_create_table(self.tablename)
         while True:
             self._trade(coin)
             time.sleep(2)
@@ -116,7 +130,8 @@ class Test(object):
             a = fix_float_radix(first_bid / second_ask)  # 左卖右买
             b = fix_float_radix(second_bid / first_ask)  # 左买右卖
             logging.info("结果 %s\t%s\t%s\t%s\t%s\t%s" % (first_bid, first_ask, second_bid, second_ask, a, b))
-            self.insert(self.tablename, x, a, b, cur_ms())
+            if not self.debug:
+                self.insert(self.tablename, x, a, b, cur_ms())
         except Exception, e:
             logging.exception("")
 
@@ -125,10 +140,11 @@ class Test(object):
 @click.option("--first", default="zb")
 @click.option("--second", default="okex")
 @click.option("--coin", default="BTC")
-def main(first, second, coin):
+@click.option('-d', "--debug", is_flag=True)
+def main(first, second, coin, debug):
     from util import read_conf
     config = read_conf("./config.json")
-    Test(config, True).trade(first, second, coin)
+    Test(config, debug).trade(first, second, coin)
 
 
 if __name__ == '__main__':
