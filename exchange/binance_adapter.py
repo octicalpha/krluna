@@ -15,9 +15,9 @@ from model import *
 from base import Exchange
 
 
-class Binance(Exchange):
+class _Binance(Exchange):
     def __init__(self, key="", secret=""):
-        super(Binance, self).__init__("binance", key, secret, "")
+        super(_Binance, self).__init__("binance", key, secret, "")
         self.client = Client(key, secret)
 
     def __transfer_symbol(self, s):
@@ -70,7 +70,7 @@ if __name__ == '__main__':
     from util import read_conf
 
     conf = read_conf(os.path.join(os.path.dirname(__file__), "../config.json"))
-    api = Binance(conf['apikey']['binance']['key'], conf['apikey']['binance']['secret'])
+    api = _Binance(conf['apikey']['binance']['key'], conf['apikey']['binance']['secret'])
     # print api.fetch_ticker('eth_usdt')
     # print api.fetch_depth("btc_usdt")
     # print api.account()

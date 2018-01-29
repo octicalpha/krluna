@@ -94,7 +94,7 @@ class TestStrategy(object):
             self.min_b = fix_float_radix((self.init_min_b - 1) * 0.6 + 1)
         elif self.amount_a - self.amount_b > 0:
             self.min_b = self.init_min_b
-        elif self.amount_b - self.amount_a > self.total_btc_amount * 0.7:  # a策略执行太多, 减少b策略阈值
+        elif self.amount_b - self.amount_a > self.total_btc_amount * 0.7:  # b策略执行太多, 减少a策略阈值
             self.min_a = fix_float_radix((self.init_min_a - 1) * 0.35 + 1)
         elif self.amount_a - self.amount_b > self.total_btc_amount * 0.3:
             self.min_a = fix_float_radix((self.init_min_a - 1) * 0.6 + 1)
