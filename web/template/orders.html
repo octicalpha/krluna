@@ -1,0 +1,42 @@
+<html>
+<head>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.6.2/css/bulma.min.css">
+</head>
+	<body>
+		<table class="table is-bordered" style="margin: 30px auto;">
+			<thead>
+				<tr>
+					<td>Id</td>
+					<td>交易所</td>
+					<td>交易所Id</td>
+					<td>币</td>
+					<td>类别</td>
+					<td>买卖</td>
+					<td>数量</td>
+					<td>价格</td>
+					<td>状态</td>
+					<td>时间</td>
+					<td>成功时间</td>
+				</tr>
+			</thead>
+			<tbody>
+				{% for x in orders %}
+				<tr>
+					<td>{{ x['id'] }}</td>
+					<td>{{ x['exchange'] }}</td>
+					<td>{{ x['ex_id'] }}</td>
+					<td>{{ x['coin'] }}</td>
+					<td>{{ x['type'] }}</td>
+					<td>{{ x['side'] }}</td>
+					<td>{{ x['amount'] }}</td>
+					<td>{{ x['price'] }}</td>
+					<td>{{ x['status'] }}</td>
+					<td>{{ x['ts'] }}</td>
+					<td>{{ x['success_ts'] }}</td>
+				</tr>
+				{% end %}
+			</tbody>
+		</table>
+	</body>
+</html>

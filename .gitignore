@@ -1,0 +1,11 @@
+*.pyc
+*.pyo
+fyz.py
+logs/
+.idea/
+
+*.sublime-project
+config*.json
+*.log
+*.sql
+test/*
