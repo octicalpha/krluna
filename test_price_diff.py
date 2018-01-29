@@ -48,6 +48,7 @@ class Test(object):
             'bithumb': ccxt.bithumb(),
             'binance': ccxt.binance(),
             'bitflyer': ccxt.bitflyer(),
+            'hitbtc': ccxt.hitbtc(),
         }
 
         self.engine = MysqlEngine(config['db']['url'])
@@ -100,7 +101,7 @@ class Test(object):
         return avg(res)
 
     def ccxt_get_bid_ask(self, exchange, coin, symbol):
-        assert exchange.id in ('bithumb', 'binance', 'bitflyer')
+        assert exchange.id in ('bithumb', 'binance', 'bitflyer', 'hitbtc')
         if exchange.id == 'bithumb':
             data = exchange.fetch_ticker(coin + '/KRW')
             return data['bid'] / 1068.6, data['ask'] / 1068.6
@@ -110,6 +111,9 @@ class Test(object):
         elif exchange.id == 'bitflyer':
             data = exchange.fetch_ticker(coin + '/JPY')
             return data['bid'] / 108.84, data['ask'] / 108.84
+        elif exchange.id == 'hitbtc':
+            data = exchange.fetch_ticker(coin + '/USD')
+            return data['bid'], data['ask']
 
     def get_bid_ask(self, exchange, coin, symbol):
         first_depth = exchange.fetch_depth(symbol)
