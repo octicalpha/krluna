@@ -47,8 +47,6 @@ def handle_command(command, channel):
         Executes bot command if the command is known
     """
     # Default response is help text for the user
-    import pdb;
-    pdb.set_trace()
     default_response = "Not sure what you mean. Try *{}*.".format(EXAMPLE_COMMAND)
 
     # Finds and executes the given command, filling in response
@@ -58,7 +56,9 @@ def handle_command(command, channel):
         response = "Sure...write some more code then I can do that!"
 
     if command == 'restart':
-        response = run_cmd("ls -l")
+        response = run_cmd("supervisorctl restart chopper_spider")
+    if command == 'stop':
+        response = run_cmd("supervisorctl stop chopper_spider")
 
     # Sends the response back to the channel
     slack_client.api_call(
