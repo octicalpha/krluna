@@ -40,8 +40,8 @@ class Tool(object):
 
         rate = 11000
         return total_usdt - init_usdt, total_btc - init_btc, \
-               total_btc * rate + total_usdt - init_btc * rate - init_usdt
-                # 100 * (total_btc * rate + total_usdt - init_btc * rate - init_usdt) / (init_btc * rate + init_usdt)
+                100 * (total_btc * rate + total_usdt - init_btc * rate - init_usdt) / (init_btc * rate + init_usdt)
+               # total_btc * rate + total_usdt - init_btc * rate - init_usdt
 
     def cancel_order(self, exchange, id, symbol):
         print self.exchanges[exchange].cancel_order(symbol, id)

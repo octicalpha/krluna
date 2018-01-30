@@ -55,10 +55,13 @@ def handle_command(command, channel):
     if command.startswith(EXAMPLE_COMMAND):
         response = "Sure...write some more code then I can do that!"
 
+    os.chdir(os.path.abspath(os.path.dirname(__file__)))
     if command == 'restart':
         response = run_cmd("supervisorctl restart chopper_spider")
     if command == 'stop':
         response = run_cmd("supervisorctl stop chopper_spider")
+    if command == 'benefit':
+        response = run_cmd("python tools.py benefit")
 
     # Sends the response back to the channel
     slack_client.api_call(

@@ -52,8 +52,8 @@ class TestStrategy(object):
         self.strategy_manager = StrategyManager(self.engine)
         self.accounts = {}
         # self.refresh_account()
-        self.init_min_a = 1.0072
-        self.init_min_b = 1.012
+        self.init_min_a = 1.007
+        self.init_min_b = 1.007
 
         self.min_a = self.init_min_a
         self.min_b = self.init_min_b
@@ -75,7 +75,7 @@ class TestStrategy(object):
         elif strategy == 'b':
             min_v = self.min_b
         assert v > min_v
-        if v >= min_v + 0.012:
+        if v >= 1.012:
             return 0.002
         return 0.001
 
@@ -85,21 +85,27 @@ class TestStrategy(object):
         self.amount_a = float(self.strategy_manager.get_sum_amount_by_name(self.strategy_a_key))
         self.amount_b = float(self.strategy_manager.get_sum_amount_by_name(self.strategy_b_key))
         self.refresh_strategy_min_v()
-        print self.amount_a, self.amount_b
+        logging.info("amount is %s\t%s" % (self.amount_a, self.amount_b))
 
     def refresh_strategy_min_v(self):
-        if self.amount_a - self.amount_b > self.total_btc_amount * 0.7:  # a策略执行太多, 减少b策略阈值
-            self.min_b = fix_float_radix((self.init_min_b - 1) * 0.5 + 1)
-        elif self.amount_a - self.amount_b > self.total_btc_amount * 0.15:
-            self.min_b = fix_float_radix((self.init_min_b - 1) * 0.75 + 1)
+        if self.amount_a - self.amount_b > 0.08:  # a策略执行太多, 增加a策略阈值
+            self.min_a = self.init_min_a + 0.008
+        elif self.amount_a - self.amount_b > 0.04:
+            self.min_a = self.init_min_a + 0.005
+        elif self.amount_a - self.amount_b > 0.02:
+            self.min_a = self.init_min_a + 0.002
         elif self.amount_a - self.amount_b > 0:
-            self.min_b = self.init_min_b
-        elif self.amount_b - self.amount_a > self.total_btc_amount * 0.7:  # b策略执行太多, 减少a策略阈值
-            self.min_a = fix_float_radix((self.init_min_a - 1) * 0.5 + 1)
-        elif self.amount_a - self.amount_b > self.total_btc_amount * 0.15:
-            self.min_a = fix_float_radix((self.init_min_a - 1) * 0.75 + 1)
-        elif self.amount_a - self.amount_b > 0:
-            self.min_a = self.init_min_a
+            self.min_a = self.init_min_a 
+        elif self.amount_b - self.amount_a > 0.1:  # b策略执行太多, 增加b策略阈值
+            self.min_b = self.init_min_b + 0.008
+        elif self.amount_b - self.amount_a > 0.07:
+            self.min_b = self.init_min_b + 0.005
+        elif self.amount_b - self.amount_a > 0.04:
+            self.min_b = self.init_min_b + 0.003
+        elif self.amount_b - self.amount_a > 0.02:
+            self.min_b = self.init_min_b + 0.0015
+        elif self.amount_b - self.amount_a > 0:
+            self.min_b = self.init_min_b 
         self.min_a = max(1.004, self.min_a)
         self.min_b = max(1.004, self.min_b)
         if not self.has_init_strategy_threshold:
@@ -212,7 +218,7 @@ class TestStrategy(object):
                                     logging.info("[a]执行a策略失败, 余额不足")
                         else:
                             self.miss_a += 1
-                            if self.miss_a > 15:
+                            if self.miss_a > 9:
                                 self.cur_a = max(a, self.min_a)
                         if b > self.cur_b:
                             if self.amount_b - self.amount_a > 0.064:
@@ -251,7 +257,7 @@ class TestStrategy(object):
                                     logging.info("[b]执行b策略失败, 余额不足")
                         else:
                             self.miss_b += 1
-                            if self.miss_b > 15:
+                            if self.miss_b > 9:
                                 self.cur_b = max(b, self.min_b)
                         self.refresh_strategy_min_v()
             except Exception, e:
