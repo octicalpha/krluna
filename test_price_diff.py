@@ -54,6 +54,7 @@ class Test(object):
             'coincheck': ccxt.coincheck(),
             "quoinex": ccxt.quoinex(),
             "bitfinex": ccxt.bitfinex(),
+            "hitbtc": ccxt.hitbtc(),
         }
 
         self.engine = MysqlEngine(config['db']['url'])
@@ -84,9 +85,7 @@ class Test(object):
         self.tablename = 'diff_%s_%s' % (first, second)
         self._check_and_create_table(self.tablename)
         while True:
-            bs = time.time()
             self._trade_async(coin)
-            print time.time() - bs
             time.sleep(2)
 
     def get_right(self, exchange, coin, li, side='bid', amount=None):
@@ -130,6 +129,9 @@ class Test(object):
             return data['bid'] / 108.84, data['ask'] / 108.84
         elif exchange.id == 'bitfinex':
             data = exchange.fetch_ticker(coin + '/USD')
+            return data['bid'], data['ask']
+        elif exchange.id == 'hitbtc':
+            data = exchange.fetch_ticker(coin + '/USDT')
             return data['bid'], data['ask']
 
     def get_bid_ask(self, exchange, coin, symbol):
