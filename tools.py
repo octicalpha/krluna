@@ -5,6 +5,8 @@ import simplejson as json
 from exchange import *
 from skyb import MysqlEngine
 import click
+from order import StrategyManager
+
 
 class Tool(object):
     def __init__(self, config):
@@ -15,6 +17,7 @@ class Tool(object):
         }
 
         self.engine = MysqlEngine(config['db']['url'])
+        self.strategy_manager = StrategyManager(self.engine)
 
     def record_account(self):
         sql = "insert into `account` values (null, ?, ?)"
@@ -39,11 +42,21 @@ class Tool(object):
 
         rate = 11000
         return total_usdt - init_usdt, total_btc - init_btc, \
-                str(fix_float_radix(100 * (total_btc * rate + total_usdt - init_btc * rate - init_usdt) / (init_btc * rate + init_usdt), 2)) + '%'
-                #total_btc * rate + total_usdt - init_btc * rate - init_usdt
+               str(fix_float_radix(
+                   100 * (total_btc * rate + total_usdt - init_btc * rate - init_usdt) / (init_btc * rate + init_usdt),
+                   2)) + '%'
+        # total_btc * rate + total_usdt - init_btc * rate - init_usdt
 
     def cancel_order(self, exchange, id, symbol):
         print self.exchanges[exchange].cancel_order(symbol, id)
+
+    def get_unfinish_strategy(self):
+        sts = self.strategy_manager.get_unfinished()
+        res = []
+        for x in sts:
+            s = '%s__%s__%s\n' % (x['name'], x['benefit'], x['amount'])
+            res.append(s)
+        return '\n'.join(res)
 
 
 tool = Tool(read_conf("./config.json"))
@@ -59,9 +72,16 @@ def cli(*args, **kw):
 def record():
     tool.record_account()
 
+
 @cli.command()
 def benefit():
     print tool.check_benefit()
+
+
+@cli.command()
+def unfinish():
+    print tool.get_unfinish_strategy()
+
 
 @cli.command()
 @click.option("--id")

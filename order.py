@@ -32,6 +32,10 @@ class OrderManager(object):
         sql = "select * from `order` where status = ?"
         return self.engine.fetch_row(sql, (status,))
 
+    def get_by_id(self, order_id):
+        sql = "select * from `order` where id = ?"
+        return self.engine.fetchone_row(sql, (order_id,))
+
 
 class StrategyManager(object):
     def __init__(self, engine):
@@ -49,3 +53,15 @@ class StrategyManager(object):
         if not a:
             return 0
         return a
+
+    def list_by_status(self, sta):
+        sql = "select * from `strategy` where status = ?"
+        return self.engine.fetch_row(sql, (sta,))
+
+    def update_status(self, id, status):
+        sql = "update `strategy` set status = ? where id = ?"
+        self.engine.execute(sql, (status, id))
+
+    def get_unfinished(self):
+        sql = "select * from `strategy` where status = 0"
+        return self.engine.fetch_row(sql, ())
