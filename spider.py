@@ -78,9 +78,11 @@ class TestStrategy(object):
         elif strategy == 'b':
             min_v = self.min_b
         assert v > min_v
-        if v >= 1.012:
-            return 0.002
-        return 0.001
+        if v >= 1.011:
+            return 0.003
+        if v >= 1.02:
+            return 0.004
+        return 0.002
 
     def refresh_amount(self, first, second):
         self.strategy_a_key = '%s_%s_%s' % (first, second, 'a')
