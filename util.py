@@ -21,6 +21,9 @@ def cur_ms():
 def avg(li):
     return sum(li) / len(li)
 
+def fix_float_radix(f, precision=4):
+    fmt = "%." + str(precision) + "f"
+    return float(fmt % f)
 
 def ms_to_str(ms):
     if ms <= 0:

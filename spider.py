@@ -78,11 +78,13 @@ class TestStrategy(object):
         elif strategy == 'b':
             min_v = self.min_b
         assert v > min_v
-        if v >= 1.011:
-            return 0.003
         if v >= 1.02:
             return 0.004
-        return 0.002
+        if v >= 1.011:
+            return 0.003
+        if v >= 0.009:
+            return 0.002
+        return 0.001
 
     def refresh_amount(self, first, second):
         self.strategy_a_key = '%s_%s_%s' % (first, second, 'a')
@@ -94,21 +96,21 @@ class TestStrategy(object):
 
     def refresh_strategy_min_v(self):
         if self.amount_a - self.amount_b > 0.08:  # a策略执行太多, 增加a策略阈值
-            self.min_a = self.init_min_a + 0.008
+            self.min_a = self.init_min_a + 0.004
         elif self.amount_a - self.amount_b > 0.04:
-            self.min_a = self.init_min_a + 0.005
-        elif self.amount_a - self.amount_b > 0.02:
             self.min_a = self.init_min_a + 0.002
+        elif self.amount_a - self.amount_b > 0.02:
+            self.min_a = self.init_min_a + 0.001
         elif self.amount_a - self.amount_b > 0:
             self.min_a = self.init_min_a
         elif self.amount_b - self.amount_a > 0.1:  # b策略执行太多, 增加b策略阈值
-            self.min_b = self.init_min_b + 0.008
+            self.min_b = self.init_min_b + 0.006
         elif self.amount_b - self.amount_a > 0.07:
-            self.min_b = self.init_min_b + 0.005
-        elif self.amount_b - self.amount_a > 0.04:
             self.min_b = self.init_min_b + 0.003
-        elif self.amount_b - self.amount_a > 0.02:
+        elif self.amount_b - self.amount_a > 0.04:
             self.min_b = self.init_min_b + 0.0015
+        elif self.amount_b - self.amount_a > 0.02:
+            self.min_b = self.init_min_b + 0.001
         elif self.amount_b - self.amount_a > 0:
             self.min_b = self.init_min_b
         self.min_a = max(1.004, self.min_a)
@@ -196,7 +198,7 @@ class TestStrategy(object):
                     elif self.has_unfinish_order():
                         logging.info("有未完成订单")
                     else:
-                        if a > self.cur_a:
+                        if a >= self.cur_a:
                             if self.amount_a - self.amount_b > 0.064:
                                 logging.info("[a]单向操作太多, 停止下单")
                             else:
@@ -242,8 +244,8 @@ class TestStrategy(object):
                         else:
                             self.miss_a += 1
                             if self.miss_a > 9:
-                                self.cur_a = max(a, self.min_a)
-                        if b > self.cur_b:
+                                self.cur_a = max(a, self.min_a) - 0.0001
+                        if b >= self.cur_b:
                             if self.amount_b - self.amount_a > 0.064:
                                 logging.info("[b]单向操作太多, 停止下单")
                             else:
@@ -291,7 +293,7 @@ class TestStrategy(object):
                         else:
                             self.miss_b += 1
                             if self.miss_b > 9:
-                                self.cur_b = max(b, self.min_b)
+                                self.cur_a = max(a, self.min_b) - 0.0001
                         self.refresh_strategy_min_v()
             except Exception, e:
                 logging.exception("")

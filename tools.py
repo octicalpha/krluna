@@ -1,11 +1,10 @@
 # coding: utf8
 
-from util import cur_ms, read_conf
+from util import cur_ms, read_conf, fix_float_radix
 import simplejson as json
 from exchange import *
 from skyb import MysqlEngine
 import click
-
 
 class Tool(object):
     def __init__(self, config):
@@ -35,13 +34,13 @@ class Tool(object):
             print v.id, acc.get_avail("usdt") + acc.get_freeze('usdt'), acc.get_avail("btc") + acc.get_freeze('btc')
 
         # sql = "select * from `account` order by id limit 1"
-        init_usdt = 3869.3595346
-        init_btc = 0.209667402
+        init_usdt = 3847.3595346
+        init_btc = 0.211667402
 
         rate = 11000
         return total_usdt - init_usdt, total_btc - init_btc, \
-                100 * (total_btc * rate + total_usdt - init_btc * rate - init_usdt) / (init_btc * rate + init_usdt)
-               # total_btc * rate + total_usdt - init_btc * rate - init_usdt
+                str(fix_float_radix(100 * (total_btc * rate + total_usdt - init_btc * rate - init_usdt) / (init_btc * rate + init_usdt), 2)) + '%'
+                #total_btc * rate + total_usdt - init_btc * rate - init_usdt
 
     def cancel_order(self, exchange, id, symbol):
         print self.exchanges[exchange].cancel_order(symbol, id)
