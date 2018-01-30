@@ -60,9 +60,9 @@ def handle_command(command, channel):
         response = run_cmd("supervisorctl restart chopper_spider")
     if command == 'stop':
         response = run_cmd("supervisorctl stop chopper_spider")
-    if command == 'benefit':
+    if command in ('benefit', 'status'):
         response = run_cmd("python tools.py benefit")
-    if command == 'unfinish':
+    if command in ('unfinish', 'unfinished'):
         response = run_cmd("python tools.py unfinish")
 
     # Sends the response back to the channel

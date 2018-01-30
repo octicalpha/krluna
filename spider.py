@@ -53,8 +53,8 @@ class TestStrategy(object):
         self.strategy_manager = StrategyManager(self.engine)
         self.accounts = {}
         # self.refresh_account()
-        self.init_min_a = 1.007
-        self.init_min_b = 1.007
+        self.init_min_a = 1.0055
+        self.init_min_b = 1.0055
 
         self.min_a = self.init_min_a
         self.min_b = self.init_min_b
@@ -96,21 +96,21 @@ class TestStrategy(object):
 
     def refresh_strategy_min_v(self):
         if self.amount_a - self.amount_b > 0.08:  # a策略执行太多, 增加a策略阈值
-            self.min_a = self.init_min_a + 0.004
+            self.min_a = self.init_min_a + 0.008
         elif self.amount_a - self.amount_b > 0.04:
-            self.min_a = self.init_min_a + 0.002
+            self.min_a = self.init_min_a + 0.005
         elif self.amount_a - self.amount_b > 0.02:
-            self.min_a = self.init_min_a + 0.001
+            self.min_a = self.init_min_a + 0.002
         elif self.amount_a - self.amount_b > 0:
             self.min_a = self.init_min_a
         elif self.amount_b - self.amount_a > 0.1:  # b策略执行太多, 增加b策略阈值
-            self.min_b = self.init_min_b + 0.006
+            self.min_b = self.init_min_b + 0.008
         elif self.amount_b - self.amount_a > 0.07:
-            self.min_b = self.init_min_b + 0.003
+            self.min_b = self.init_min_b + 0.005
         elif self.amount_b - self.amount_a > 0.04:
-            self.min_b = self.init_min_b + 0.0015
+            self.min_b = self.init_min_b + 0.0035
         elif self.amount_b - self.amount_a > 0.02:
-            self.min_b = self.init_min_b + 0.001
+            self.min_b = self.init_min_b + 0.002
         elif self.amount_b - self.amount_a > 0:
             self.min_b = self.init_min_b
         self.min_a = max(1.004, self.min_a)
@@ -193,13 +193,13 @@ class TestStrategy(object):
                 logging.info("策略结果 %s\t%s, 阈值: %s\t%s" % (a, b, self.cur_a, self.cur_b))
                 if not self.debug and x == 'BTC':
                     self.insert(self.tablename, x, a, b, ts)
-                    if self.trade_cnt >= 40:
+                    if self.trade_cnt >= 50:
                         logging.info("交易太多次")
                     elif self.has_unfinish_order():
                         logging.info("有未完成订单")
                     else:
                         if a >= self.cur_a:
-                            if self.amount_a - self.amount_b > 0.064:
+                            if self.amount_a - self.amount_b > 0.095:
                                 logging.info("[a]单向操作太多, 停止下单")
                             else:
                                 self.miss_a = 0
@@ -246,7 +246,7 @@ class TestStrategy(object):
                             if self.miss_a > 9:
                                 self.cur_a = max(a, self.min_a) - 0.0001
                         if b >= self.cur_b:
-                            if self.amount_b - self.amount_a > 0.064:
+                            if self.amount_b - self.amount_a >= 0.12:
                                 logging.info("[b]单向操作太多, 停止下单")
                             else:
                                 self.miss_b = 0
@@ -293,7 +293,7 @@ class TestStrategy(object):
                         else:
                             self.miss_b += 1
                             if self.miss_b > 9:
-                                self.cur_a = max(a, self.min_b) - 0.0001
+                                self.cur_b = max(b, self.min_b) - 0.0001
                         self.refresh_strategy_min_v()
             except Exception, e:
                 logging.exception("")

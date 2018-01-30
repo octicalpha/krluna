@@ -37,7 +37,7 @@ class OrderScanner(object):
                 if first_order['status'] == ORDER_STATUS.SUCCESS and second_order['status'] == ORDER_STATUS.SUCCESS:
                     self.strategy_manager.update_status(st['id'], 1)
 
-            time.sleep(5)
+            time.sleep(2)
 
 
 if __name__ == '__main__':

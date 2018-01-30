@@ -44,8 +44,13 @@ def top(li, percent=0.1):
 
 class OrderHandler(tornado.web.RequestHandler):
     def get(self):
-        sql = "select * from `order` order by id desc"
-        data = self.application.engine.fetch_row(sql, ())
+        status = self.get_argument('status', None)
+        if status is None:
+            sql = "select * from `order` order by id desc"
+            data = self.application.engine.fetch_row(sql, ())
+        else:
+            sql = "select * from `order` where status = ? order by id desc"
+            data = self.application.engine.fetch_row(sql, (int(status),))
         for x in data:
             x['ts'] = ms_to_humanize(x['ts'])
             x['success_ts'] = ms_to_humanize(x['success_ts'])
