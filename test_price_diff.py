@@ -112,7 +112,7 @@ class Test(object):
             data = exchange.fetch_ticker(coin + '/JPY')
             return data['bid'] / 108.84, data['ask'] / 108.84
         elif exchange.id == 'hitbtc':
-            data = exchange.fetch_ticker(coin + '/USD')
+            data = exchange.fetch_ticker(coin + '/USDT')
             return data['bid'], data['ask']
 
     def get_bid_ask(self, exchange, coin, symbol):

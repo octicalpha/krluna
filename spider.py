@@ -52,7 +52,7 @@ class TestStrategy(object):
         self.strategy_manager = StrategyManager(self.engine)
         self.accounts = {}
         # self.refresh_account()
-        self.init_min_a = 1.01
+        self.init_min_a = 1.0072
         self.init_min_b = 1.012
 
         self.min_a = self.init_min_a
@@ -76,8 +76,8 @@ class TestStrategy(object):
             min_v = self.min_b
         assert v > min_v
         if v >= min_v + 0.012:
-            return 0.003
-        return 0.002
+            return 0.002
+        return 0.001
 
     def refresh_amount(self, first, second):
         self.strategy_a_key = '%s_%s_%s' % (first, second, 'a')
@@ -96,7 +96,7 @@ class TestStrategy(object):
             self.min_b = self.init_min_b
         elif self.amount_b - self.amount_a > self.total_btc_amount * 0.7:  # b策略执行太多, 减少a策略阈值
             self.min_a = fix_float_radix((self.init_min_a - 1) * 0.5 + 1)
-        elif self.amount_a - self.amount_b > self.total_btc_amount * 0.3:
+        elif self.amount_a - self.amount_b > self.total_btc_amount * 0.15:
             self.min_a = fix_float_radix((self.init_min_a - 1) * 0.75 + 1)
         elif self.amount_a - self.amount_b > 0:
             self.min_a = self.init_min_a
@@ -186,6 +186,7 @@ class TestStrategy(object):
                                 # self.cur_a = (a + self.cur_a) / 2
                                 self.cur_a = a
                                 if balance[1] > 0.001 and balance[2] > 20:
+                                    #second_price = second_ask - 0.0001
                                     second_price = second_ask 
                                     logging.info("[a]真正执行a策略, price is: %s %s", first_bid, second_price)
                                     # amount = 0.001
@@ -211,7 +212,7 @@ class TestStrategy(object):
                                     logging.info("[a]执行a策略失败, 余额不足")
                         else:
                             self.miss_a += 1
-                            if self.miss_a > 6:
+                            if self.miss_a > 15:
                                 self.cur_a = max(a, self.min_a)
                         if b > self.cur_b:
                             if self.amount_b - self.amount_a > 0.064:
@@ -222,7 +223,8 @@ class TestStrategy(object):
                                 # self.cur_b = (b + self.cur_b) / 2
                                 self.cur_b = b
                                 if balance[3] > 0.001 and balance[0] > 20:
-                                    second_price = second_bid 
+                                    #second_price = second_bid  + 0.0001
+                                    second_price = second_bid  
                                     logging.info("[b]真正执行b策略, price is: %s %s", first_ask, second_price)
                                     # amount = 0.001
                                     amount = self._cal_due_amount('b', b)
@@ -249,7 +251,7 @@ class TestStrategy(object):
                                     logging.info("[b]执行b策略失败, 余额不足")
                         else:
                             self.miss_b += 1
-                            if self.miss_b > 6:
+                            if self.miss_b > 15:
                                 self.cur_b = max(b, self.min_b)
                         self.refresh_strategy_min_v()
             except Exception, e:
