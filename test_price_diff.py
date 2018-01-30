@@ -50,6 +50,7 @@ class Test(object):
             'bitflyer': ccxt.bitflyer(),
             'hitbtc': ccxt.hitbtc(),
             'coincheck': ccxt.coincheck(),
+            "quoinex": ccxt.quoinex(),
         }
 
         self.engine = MysqlEngine(config['db']['url'])
@@ -83,8 +84,6 @@ class Test(object):
             time.sleep(2)
 
     def get_right(self, exchange, coin, li, side='bid', amount=None):
-        if exchange.id == 'bithumb':
-            return self.ccxt_get_right(exchange, side)
         total = 0
         res = []
         if amount is None:
@@ -115,6 +114,12 @@ class Test(object):
             data = exchange.fetch_ticker(coin + '/USDT')
             return data['bid'], data['ask']
         elif exchange.id == 'coincheck':
+            data = exchange.fetch_ticker(coin + '/JPY')
+            return data['bid'] / 108.84, data['ask'] / 108.84
+        elif exchange.id == 'coincheck':
+            data = exchange.fetch_ticker(coin + '/JPY')
+            return data['bid'] / 108.84, data['ask'] / 108.84
+        elif exchange.id == 'quoinex':
             data = exchange.fetch_ticker(coin + '/JPY')
             return data['bid'] / 108.84, data['ask'] / 108.84
 
