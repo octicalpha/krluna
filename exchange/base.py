@@ -27,11 +27,11 @@ class Exchange(object):
         # TODO(zz) 实现余额不足Exception
         raise NotImplementedError
 
-    def buy_limit(self, symbol, amount, price):
+    def buy_limit(self, symbol, amount=None, price=None):
         assert amount is not None and price is not None
         return self.order(symbol, "buy", type="limit", amount=amount, price=price)
 
-    def sell_limit(self, symbol, amount, price):
+    def sell_limit(self, symbol, amount=None, price=None):
         assert amount is not None and price is not None
         return self.order(symbol, "sell", type="limit", amount=amount, price=price)
 

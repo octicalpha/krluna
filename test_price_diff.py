@@ -9,6 +9,8 @@ from exchange import *
 from order import *
 import os
 from util import slack
+import threading
+from concurrent.futures import ThreadPoolExecutor, wait, as_completed
 
 AMOUNT_THRESHOLD = {
     "BTC": 0.001,
@@ -51,11 +53,13 @@ class Test(object):
             'hitbtc': ccxt.hitbtc(),
             'coincheck': ccxt.coincheck(),
             "quoinex": ccxt.quoinex(),
+            "bitfinex": ccxt.bitfinex(),
         }
 
         self.engine = MysqlEngine(config['db']['url'])
         self.order_manager = OrderManager(self.engine)
         self.accounts = {}
+        self.pool = ThreadPoolExecutor(3)  # for many urls, this should probably be capped at some value.
 
     def _check_and_create_table(self, tablename):
         sql = '''
@@ -80,7 +84,9 @@ class Test(object):
         self.tablename = 'diff_%s_%s' % (first, second)
         self._check_and_create_table(self.tablename)
         while True:
-            self._trade(coin)
+            bs = time.time()
+            self._trade_async(coin)
+            print time.time() - bs
             time.sleep(2)
 
     def get_right(self, exchange, coin, li, side='bid', amount=None):
@@ -122,13 +128,41 @@ class Test(object):
         elif exchange.id == 'quoinex':
             data = exchange.fetch_ticker(coin + '/JPY')
             return data['bid'] / 108.84, data['ask'] / 108.84
-
+        elif exchange.id == 'bitfinex':
+            data = exchange.fetch_ticker(coin + '/USD')
+            return data['bid'], data['ask']
 
     def get_bid_ask(self, exchange, coin, symbol):
         first_depth = exchange.fetch_depth(symbol)
         first_bid = self.get_right(exchange, coin, first_depth['bids'], 'bid')
         first_ask = self.get_right(exchange, coin, first_depth['asks'], 'ask')
         return first_bid, first_ask
+
+    def _com_get_bid_ask(self, exchange, coin, symbol):
+        try:
+            first_bid, first_ask = self.get_bid_ask(exchange, coin, symbol)
+        except:
+            first_bid, first_ask = self.ccxt_get_bid_ask(exchange, coin, symbol)
+        return first_bid, first_ask
+
+    def _trade_async(self, coin):
+        x = coin
+        try:
+            symbol = x + "_USDT"
+
+            first_future = self.pool.submit(self._com_get_bid_ask, self.first_api, coin, symbol)
+            second_future = self.pool.submit(self._com_get_bid_ask, self.second_api, coin, symbol)
+
+            first_bid, first_ask = first_future.result()
+            second_bid, second_ask = second_future.result()
+
+            a = fix_float_radix(first_bid / second_ask)  # 左卖右买
+            b = fix_float_radix(second_bid / first_ask)  # 左买右卖
+            logging.info("结果 %s\t%s\t%s\t%s\t%s\t%s" % (first_bid, first_ask, second_bid, second_ask, a, b))
+            if not self.debug:
+                self.insert(self.tablename, x, a, b, cur_ms())
+        except Exception, e:
+            logging.exception("")
 
     def _trade(self, coin):
         x = coin

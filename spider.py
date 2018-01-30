@@ -9,6 +9,7 @@ from exchange import *
 from order import *
 import os
 from util import slack
+from concurrent.futures import ThreadPoolExecutor, wait, as_completed
 
 AMOUNT_THRESHOLD = {
     "BTC": 0.001,
@@ -69,6 +70,8 @@ class TestStrategy(object):
 
         self.has_init_strategy_threshold = False
 
+        self.pool = ThreadPoolExecutor(3)  # for many urls, this should probably be capped at some value.
+
     def _cal_due_amount(self, strategy, v):
         if strategy == 'a':
             min_v = self.min_a
@@ -95,7 +98,7 @@ class TestStrategy(object):
         elif self.amount_a - self.amount_b > 0.02:
             self.min_a = self.init_min_a + 0.002
         elif self.amount_a - self.amount_b > 0:
-            self.min_a = self.init_min_a 
+            self.min_a = self.init_min_a
         elif self.amount_b - self.amount_a > 0.1:  # b策略执行太多, 增加b策略阈值
             self.min_b = self.init_min_b + 0.008
         elif self.amount_b - self.amount_a > 0.07:
@@ -105,7 +108,7 @@ class TestStrategy(object):
         elif self.amount_b - self.amount_a > 0.02:
             self.min_b = self.init_min_b + 0.0015
         elif self.amount_b - self.amount_a > 0:
-            self.min_b = self.init_min_b 
+            self.min_b = self.init_min_b
         self.min_a = max(1.004, self.min_a)
         self.min_b = max(1.004, self.min_b)
         if not self.has_init_strategy_threshold:
@@ -130,7 +133,9 @@ class TestStrategy(object):
         self.tablename = 'diff_%s_%s' % (first, second)
         self.refresh_amount(first, second)
         while True:
+            bs = time.time()
             self._trade()
+            print time.time() - bs
             time.sleep(2)
 
     def get_right(self, exchange, coin, li, side='bid', amount=None):
@@ -165,8 +170,14 @@ class TestStrategy(object):
                 #            self.second_account.get_avail('usdt'), self.second_account.get_avail('btc')
                 #            ]
                 balance = [1000, 0.05, 1000, 0.05]
-                first_depth = self.first_api.fetch_depth(symbol)
-                second_depth = self.second_api.fetch_depth(symbol)
+                # first_depth = self.first_api.fetch_depth(symbol)
+                # second_depth = self.second_api.fetch_depth(symbol)
+
+                future_first = self.pool.submit(self.first_api.fetch_depth, symbol)
+                future_second = self.pool.submit(self.second_api.fetch_depth, symbol)
+
+                first_depth = future_first.result()
+                second_depth = future_second.result()
 
                 first_bid = self.get_right(self.first_api, x, first_depth['bids'], 'bid')
                 first_ask = self.get_right(self.first_api, x, first_depth['asks'], 'ask')
@@ -176,9 +187,9 @@ class TestStrategy(object):
                 a = fix_float_radix(first_bid / second_ask)  # 左卖右买
                 b = fix_float_radix(second_bid / first_ask)  # 左买右卖
                 logging.info("策略结果 %s\t%s, 阈值: %s\t%s" % (a, b, self.cur_a, self.cur_b))
-                self.insert(self.tablename, x, a, b, ts)
                 if not self.debug and x == 'BTC':
-                    if self.trade_cnt >= 25:
+                    self.insert(self.tablename, x, a, b, ts)
+                    if self.trade_cnt >= 40:
                         logging.info("交易太多次")
                     elif self.has_unfinish_order():
                         logging.info("有未完成订单")
@@ -192,8 +203,8 @@ class TestStrategy(object):
                                 # self.cur_a = (a + self.cur_a) / 2
                                 self.cur_a = a
                                 if balance[1] > 0.001 and balance[2] > 20:
-                                    #second_price = second_ask - 0.0001
-                                    second_price = second_ask 
+                                    # second_price = second_ask - 0.0001
+                                    second_price = second_ask
                                     logging.info("[a]真正执行a策略, price is: %s %s", first_bid, second_price)
                                     # amount = 0.001
                                     amount = self._cal_due_amount('a', a)
@@ -203,11 +214,21 @@ class TestStrategy(object):
                                                                                   second_price)
                                     logging.info("[a]创建订单记录 sell_record_id: %s , buy_record_id %s" % (
                                         sell_record_id, buy_record_id))
-                                    sell_order_id = self.first_api.order(symbol, 'sell', price=first_bid, amount=amount)
+                                    # sell_order_id = self.first_api.sell_limit(symbol, price=first_bid, amount=amount)
+                                    # buy_order_id = self.second_api.buy_limit(symbol, price=second_price, amount=amount)
+
+                                    sell_order_id_future = self.pool.submit(self.first_api.sell_limit, symbol,
+                                                                            price=first_bid, amount=amount)
+                                    buy_order_id_future = self.pool.submit(self.second_api.buy_limit, symbol,
+                                                                           price=second_price, amount=amount)
+
+                                    sell_order_id = sell_order_id_future.result()
+                                    buy_order_id = buy_order_id_future.result()
+
                                     logging.info("[a]发送卖单成功 sell_order_id: %s" % sell_order_id)
-                                    self.order_manager.update_ex_id(sell_record_id, sell_order_id)
-                                    buy_order_id = self.second_api.order(symbol, 'buy', price=second_price, amount=amount)
                                     logging.info("[a]发送买单成功 buy_order_id: %s" % buy_order_id)
+
+                                    self.order_manager.update_ex_id(sell_record_id, sell_order_id)
                                     self.order_manager.update_ex_id(buy_record_id, buy_order_id)
                                     self.amount_a += amount
                                     self.trade_cnt += 1
@@ -229,8 +250,8 @@ class TestStrategy(object):
                                 # self.cur_b = (b + self.cur_b) / 2
                                 self.cur_b = b
                                 if balance[3] > 0.001 and balance[0] > 20:
-                                    #second_price = second_bid  + 0.0001
-                                    second_price = second_bid  
+                                    # second_price = second_bid  + 0.0001
+                                    second_price = second_bid
                                     logging.info("[b]真正执行b策略, price is: %s %s", first_ask, second_price)
                                     # amount = 0.001
                                     amount = self._cal_due_amount('b', b)
@@ -241,12 +262,22 @@ class TestStrategy(object):
                                                                                    second_price)
                                     logging.info("[b]创建订单记录 sell_record_id: %s , buy_record_id %s" % (
                                         sell_record_id, buy_record_id))
-                                    buy_order_id = self.first_api.order(symbol, 'buy', price=first_ask, amount=amount)
-                                    self.order_manager.update_ex_id(buy_record_id, buy_order_id)
+                                    # buy_order_id = self.first_api.buy_limit(symbol, price=first_ask, amount=amount)
+                                    # sell_order_id = self.second_api.sell_limit(symbol, price=second_price,
+                                    #                                            amount=amount)
+
+                                    buy_order_id_future = self.pool.submit(self.first_api.buy_limit, symbol,
+                                                                           price=first_ask, amount=amount)
+                                    sell_order_id_future = self.pool.submit(self.second_api.sell_limit, symbol,
+                                                                            price=second_price,
+                                                                            amount=amount)
+
+                                    sell_order_id = sell_order_id_future.result()
+                                    buy_order_id = buy_order_id_future.result()
+
                                     logging.info("[b]发送买单成功 buy_order_id: %s" % buy_order_id)
-                                    sell_order_id = self.second_api.order(symbol, 'sell', price=second_price,
-                                                                          amount=amount)
                                     logging.info("[b]发送卖单成功 sell_order_id: %s" % sell_order_id)
+                                    self.order_manager.update_ex_id(buy_record_id, buy_order_id)
                                     self.order_manager.update_ex_id(sell_record_id, sell_order_id)
                                     self.amount_b += amount
                                     self.trade_cnt += 1
