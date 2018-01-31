@@ -78,6 +78,7 @@ class TestStrategy(object):
         elif strategy == 'b':
             min_v = self.min_b
         assert v > min_v
+        return 0.001
         if v >= 1.02:
             return 0.004
         if v >= 1.011:
@@ -95,7 +96,9 @@ class TestStrategy(object):
         logging.info("amount is %s\t%s" % (self.amount_a, self.amount_b))
 
     def refresh_strategy_min_v(self):
-        if self.amount_a - self.amount_b > 0.08:  # a策略执行太多, 增加a策略阈值
+        if self.amount_a - self.amount_b > 0.09:  # a策略执行太多, 增加a策略阈值
+            self.min_a = self.init_min_a + 1
+        elif self.amount_a - self.amount_b > 0.08:  # a策略执行太多, 增加a策略阈值
             self.min_a = self.init_min_a + 0.008
         elif self.amount_a - self.amount_b > 0.04:
             self.min_a = self.init_min_a + 0.005
@@ -103,6 +106,8 @@ class TestStrategy(object):
             self.min_a = self.init_min_a + 0.002
         elif self.amount_a - self.amount_b > 0:
             self.min_a = self.init_min_a
+        elif self.amount_b - self.amount_a > 0.12:  # b策略执行太多, 增加b策略阈值
+            self.min_b = self.init_min_b + 1
         elif self.amount_b - self.amount_a > 0.1:  # b策略执行太多, 增加b策略阈值
             self.min_b = self.init_min_b + 0.008
         elif self.amount_b - self.amount_a > 0.07:
@@ -118,12 +123,17 @@ class TestStrategy(object):
         if not self.has_init_strategy_threshold:
             self.cur_a = self.min_a
             self.cur_b = self.min_b
+        else:
+            self.cur_a = max(self.cur_a, self.min_a)
+            self.cur_b = max(self.cur_b, self.min_b)
 
         self.has_init_strategy_threshold = True
 
     def refresh_account(self):
         for k, v in self.exchanges.iteritems():
-            self.accounts[k] = v.account()
+            a = v.account()
+            logging.info("account %s: %s" % (k, a))
+            self.accounts[k] = a
 
     def insert(self, table, coin, a, b, ts):
         sql = "insert into " + table + " (coin, ab, ba, ts) values (?, ?, ?, ?)"
@@ -193,9 +203,9 @@ class TestStrategy(object):
                 logging.info("策略结果 %s\t%s, 阈值: %s\t%s" % (a, b, self.cur_a, self.cur_b))
                 if not self.debug and x == 'BTC':
                     self.insert(self.tablename, x, a, b, ts)
-                    if self.trade_cnt >= 50:
-                        logging.info("交易太多次")
-                    elif self.has_unfinish_order():
+                    #if self.trade_cnt >= 50:
+                    #    logging.info("交易太多次")
+                    if self.has_unfinish_order():
                         logging.info("有未完成订单")
                     else:
                         if a >= self.cur_a:
@@ -253,12 +263,12 @@ class TestStrategy(object):
                                 logging.info("[b]准备执行b策略\t%s" % b)
                                 # self.cur_b = (b + self.cur_b) / 2
                                 self.cur_b = b
-                                if balance[3] > 0.001 and balance[0] > 20:
+                                amount = self._cal_due_amount('b', b)
+                                if balance[3] > amount and balance[0] > 20:
                                     # second_price = second_bid  + 0.0001
                                     second_price = second_bid
                                     logging.info("[b]真正执行b策略, price is: %s %s", first_ask, second_price)
                                     # amount = 0.001
-                                    amount = self._cal_due_amount('b', b)
                                     buy_record_id = self.order_manager.init_order(self.first_api.id, x, 'buy', amount,
                                                                                   first_ask)
                                     sell_record_id = self.order_manager.init_order(self.second_api.id, x, 'sell',
