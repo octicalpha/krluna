@@ -90,8 +90,9 @@ class IndexHandler(tornado.web.RequestHandler):
 
         top_ab = top([x[1] for x in ab_seq])
         top_ba = top([x[1] for x in ba_seq])
+        fee = 0.003
         title = '%s ~ %s GOOD: %s %s %s' % (
-        ms_to_str(data[0][-1]), ms_to_str(data[-1][-1]), top_ab, top_ba, top_ab * top_ba)
+            ms_to_str(data[0][-1]), ms_to_str(data[-1][-1]), top_ab, top_ba, (float(top_ab) - fee)  * (float(top_ba) - fee))
 
         option = {
             "title": {"text": title},

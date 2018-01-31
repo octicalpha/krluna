@@ -78,7 +78,6 @@ class TestStrategy(object):
         elif strategy == 'b':
             min_v = self.min_b
         assert v > min_v
-        return 0.001
         if v >= 1.02:
             return 0.004
         if v >= 1.011:
@@ -150,7 +149,7 @@ class TestStrategy(object):
             bs = time.time()
             self._trade()
             print time.time() - bs
-            time.sleep(2)
+            time.sleep(1.3)
 
     def get_right(self, exchange, coin, li, side='bid', amount=None):
         total = 0
@@ -267,10 +266,11 @@ class TestStrategy(object):
                                 if balance[3] > amount and balance[0] > 20:
                                     # second_price = second_bid  + 0.0001
                                     second_price = second_bid
-                                    logging.info("[b]真正执行b策略, price is: %s %s", first_ask, second_price)
+                                    first_price = first_ask
+                                    logging.info("[b]真正执行b策略, price is: %s %s", first_price, second_price)
                                     # amount = 0.001
                                     buy_record_id = self.order_manager.init_order(self.first_api.id, x, 'buy', amount,
-                                                                                  first_ask)
+                                                                                  first_price)
                                     sell_record_id = self.order_manager.init_order(self.second_api.id, x, 'sell',
                                                                                    amount,
                                                                                    second_price)
@@ -281,7 +281,7 @@ class TestStrategy(object):
                                     #                                            amount=amount)
 
                                     buy_order_id_future = self.pool.submit(self.first_api.buy_limit, symbol,
-                                                                           price=first_ask, amount=amount)
+                                                                           price=first_price, amount=amount)
                                     sell_order_id_future = self.pool.submit(self.second_api.sell_limit, symbol,
                                                                             price=second_price,
                                                                             amount=amount)

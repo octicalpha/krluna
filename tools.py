@@ -41,6 +41,7 @@ class Tool(object):
         init_btc = 0.211667402
 
         rate = float(self.exchanges['okex'].fetch_ticker('btc_usdt')['ticker']['last'])
+        #rate = 11500
         return total_usdt - init_usdt, total_btc - init_btc, \
                total_btc * rate + total_usdt - init_btc * rate - init_usdt, \
                total_btc * rate + total_usdt, \
