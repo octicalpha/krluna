@@ -46,6 +46,7 @@ class Test(object):
         self.exchanges = {
             'zb': Zb(key_config['zb']['key'], key_config['zb']['secret']),
             'okex': Okex(key_config['okex']['key'], key_config['okex']['secret']),
+            'weex': Weex(key_config['weex']['key'], key_config['weex']['secret']),
             # 'huobipro': Huobipro(key_config['huobipro']['key'], key_config['huobipro']['secret']),
             'bithumb': ccxt.bithumb(),
             'binance': ccxt.binance(),
@@ -61,6 +62,8 @@ class Test(object):
         self.order_manager = OrderManager(self.engine)
         self.accounts = {}
         self.pool = ThreadPoolExecutor(3)  # for many urls, this should probably be capped at some value.
+
+        self.async = False
 
     def _check_and_create_table(self, tablename):
         sql = '''
@@ -152,33 +155,15 @@ class Test(object):
         try:
             symbol = x + "_USDT"
 
-            first_future = self.pool.submit(self._com_get_bid_ask, self.first_api, coin, symbol)
-            second_future = self.pool.submit(self._com_get_bid_ask, self.second_api, coin, symbol)
+            if self.async:
+                first_future = self.pool.submit(self._com_get_bid_ask, self.first_api, coin, symbol)
+                second_future = self.pool.submit(self._com_get_bid_ask, self.second_api, coin, symbol)
 
-            first_bid, first_ask = first_future.result()
-            second_bid, second_ask = second_future.result()
-
-            a = fix_float_radix(first_bid / second_ask)  # 左卖右买
-            b = fix_float_radix(second_bid / first_ask)  # 左买右卖
-            logging.info("结果 %s\t%s\t%s\t%s\t%s\t%s" % (first_bid, first_ask, second_bid, second_ask, a, b))
-            if not self.debug:
-                self.insert(self.tablename, x, a, b, cur_ms())
-        except Exception, e:
-            logging.exception("")
-
-    def _trade(self, coin):
-        x = coin
-        try:
-            symbol = x + "_USDT"
-
-            try:
-                first_bid, first_ask = self.get_bid_ask(self.first_api, coin, symbol)
-            except:
-                first_bid, first_ask = self.ccxt_get_bid_ask(self.first_api, coin, symbol)
-            try:
-                second_bid, second_ask = self.get_bid_ask(self.second_api, coin, symbol)
-            except:
-                second_bid, second_ask = self.ccxt_get_bid_ask(self.second_api, coin, symbol)
+                first_bid, first_ask = first_future.result()
+                second_bid, second_ask = second_future.result()
+            else:
+                first_bid, first_ask = self._com_get_bid_ask(self.first_api, coin, symbol)
+                second_bid, second_ask = self._com_get_bid_ask(self.second_api, coin, symbol)
 
             a = fix_float_radix(first_bid / second_ask)  # 左卖右买
             b = fix_float_radix(second_bid / first_ask)  # 左买右卖
