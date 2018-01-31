@@ -8,8 +8,9 @@ import simplejson as json
 from exchange import *
 from order import *
 import os
-from util import slack
+from util import slack, cur_ms
 from concurrent.futures import ThreadPoolExecutor, wait, as_completed
+from balancer import DefaultTwoSideBalancer, Balancer
 
 AMOUNT_THRESHOLD = {
     "BTC": 0.001,
@@ -26,10 +27,6 @@ def fix_float_radix(f):
 
 
 import time
-
-
-def now():
-    return int(time.time() * 1000)
 
 
 def avg(li):
@@ -51,74 +48,25 @@ class TestStrategy(object):
         self.engine = MysqlEngine(config['db']['url'])
         self.order_manager = OrderManager(self.engine)
         self.strategy_manager = StrategyManager(self.engine)
-        self.accounts = {}
-        # self.refresh_account()
-        self.init_min_a = 1.0055
-        self.init_min_b = 1.0055
 
-        self.min_a = self.init_min_a
-        self.min_b = self.init_min_b
+        self.min_a = 1.0055
+        self.min_b = 1.0055
 
         self.cur_a = self.min_a
         self.cur_b = self.min_b
         self.miss_a = 0
         self.miss_b = 0
 
-        self.trade_cnt = 0
-
-        self.total_btc_amount = 0.09
-
         self.has_init_strategy_threshold = False
 
-        self.pool = ThreadPoolExecutor(3)  # for many urls, this should probably be capped at some value.
+        self.pool = ThreadPoolExecutor(3)
 
-    def _cal_due_amount(self, strategy, v):
-        if strategy == 'a':
-            min_v = self.min_a
-        elif strategy == 'b':
-            min_v = self.min_b
-        assert v > min_v
-        if v >= 1.02:
-            return 0.004
-        if v >= 1.011:
-            return 0.003
-        if v >= 0.009:
-            return 0.002
-        return 0.001
-
-    def refresh_amount(self, first, second):
-        self.strategy_a_key = '%s_%s_%s' % (first, second, 'a')
-        self.strategy_b_key = '%s_%s_%s' % (first, second, 'b')
-        self.amount_a = float(self.strategy_manager.get_sum_amount_by_name(self.strategy_a_key))
-        self.amount_b = float(self.strategy_manager.get_sum_amount_by_name(self.strategy_b_key))
-        self.refresh_strategy_min_v()
-        logging.info("amount is %s\t%s" % (self.amount_a, self.amount_b))
+        self.accounts = {}
+        self.balancer = None
+        self.init_balancer()
 
     def refresh_strategy_min_v(self):
-        if self.amount_a - self.amount_b > 0.09:  # a策略执行太多, 增加a策略阈值
-            self.min_a = self.init_min_a + 1
-        elif self.amount_a - self.amount_b > 0.08:  # a策略执行太多, 增加a策略阈值
-            self.min_a = self.init_min_a + 0.008
-        elif self.amount_a - self.amount_b > 0.04:
-            self.min_a = self.init_min_a + 0.005
-        elif self.amount_a - self.amount_b > 0.02:
-            self.min_a = self.init_min_a + 0.002
-        elif self.amount_a - self.amount_b > 0:
-            self.min_a = self.init_min_a
-        elif self.amount_b - self.amount_a > 0.12:  # b策略执行太多, 增加b策略阈值
-            self.min_b = self.init_min_b + 1
-        elif self.amount_b - self.amount_a > 0.1:  # b策略执行太多, 增加b策略阈值
-            self.min_b = self.init_min_b + 0.008
-        elif self.amount_b - self.amount_a > 0.07:
-            self.min_b = self.init_min_b + 0.005
-        elif self.amount_b - self.amount_a > 0.04:
-            self.min_b = self.init_min_b + 0.0035
-        elif self.amount_b - self.amount_a > 0.02:
-            self.min_b = self.init_min_b + 0.002
-        elif self.amount_b - self.amount_a > 0:
-            self.min_b = self.init_min_b
-        self.min_a = max(1.004, self.min_a)
-        self.min_b = max(1.004, self.min_b)
+        self.min_a, self.min_b = self.balancer.get_threshold()
         if not self.has_init_strategy_threshold:
             self.cur_a = self.min_a
             self.cur_b = self.min_b
@@ -128,28 +76,32 @@ class TestStrategy(object):
 
         self.has_init_strategy_threshold = True
 
-    def refresh_account(self):
+    def init_balancer(self):
         for k, v in self.exchanges.iteritems():
             a = v.account()
             logging.info("account %s: %s" % (k, a))
             self.accounts[k] = a
 
-    def insert(self, table, coin, a, b, ts):
-        sql = "insert into " + table + " (coin, ab, ba, ts) values (?, ?, ?, ?)"
-        self.engine.execute(sql, (coin, a, b, ts))
+    def insert_diff_to_table(self, coin, a, b):
+        sql = "insert into " + self.diff_tablename + " (coin, ab, ba, ts) values (?, ?, ?, ?)"
+        self.engine.execute(sql, (coin, a, b, cur_ms()))
 
     def trade(self, first, second):
         self.first_api = self.exchanges.get(first)
         self.second_api = self.exchanges.get(second)
-        # self.first_account = self.accounts.get(first)
-        # self.second_account = self.accounts.get(second)
-        self.tablename = 'diff_%s_%s' % (first, second)
-        self.refresh_amount(first, second)
+        first_account = self.accounts.get(first)
+        second_account = self.accounts.get(second)
+        self.balancer = DefaultTwoSideBalancer(
+            first_account.get_avail("btc"), first_account.get_avail("usdt"),
+            second_account.get_avail("btc"), second_account.get_avail("usdt")
+        )
+        self.diff_tablename = 'diff_%s_%s' % (first, second)
+        self.strategy_a_key = '%s_%s_%s' % (first, second, 'a')
+        self.strategy_b_key = '%s_%s_%s' % (first, second, 'b')
+        self.refresh_strategy_min_v()
         while True:
-            bs = time.time()
-            self._trade()
-            print time.time() - bs
-            time.sleep(1.3)
+            self._trade("BTC")
+            time.sleep(1.8)
 
     def get_right(self, exchange, coin, li, side='bid', amount=None):
         total = 0
@@ -168,145 +120,118 @@ class TestStrategy(object):
         return avg(res)
 
     def has_unfinish_order(self):
-        a = len(self.order_manager.list_by_status(ORDER_STATUS.PLACED)) >= 4
+        a = len(self.order_manager.list_by_status(ORDER_STATUS.PLACED)) >= 6
         if a:
             return a
         a = len(self.order_manager.list_by_status(ORDER_STATUS.INIT)) > 2
         return a
 
-    def _trade(self):
-        ts = now()
-        for x in self.CHECK_COINS:
-            try:
-                symbol = x + "_USDT"
-                # balance = [self.first_account.get_avail('usdt'), self.first_account.get_avail('btc'),
-                #            self.second_account.get_avail('usdt'), self.second_account.get_avail('btc')
-                #            ]
-                balance = [1000, 0.05, 1000, 0.05]
-                # first_depth = self.first_api.fetch_depth(symbol)
-                # second_depth = self.second_api.fetch_depth(symbol)
+    def analyze_price_from_depth(self, first_depth, second_depth, coin):
+        first_bid = self.get_right(self.first_api, coin, first_depth['bids'], 'bid')
+        first_ask = self.get_right(self.first_api, coin, first_depth['asks'], 'ask')
+        second_bid = self.get_right(self.second_api, coin, second_depth['bids'], 'bid')
+        second_ask = self.get_right(self.second_api, coin, second_depth['asks'], 'ask')
 
-                future_first = self.pool.submit(self.first_api.fetch_depth, symbol)
-                future_second = self.pool.submit(self.second_api.fetch_depth, symbol)
+        return first_bid, first_ask, second_bid, second_ask
 
-                first_depth = future_first.result()
-                second_depth = future_second.result()
+    def trade_from_left_to_right(self, coin, symbol, first_bid, first_ask, second_bid, second_ask, radio):
+        avg_coin_price = (first_bid + first_ask + second_bid + second_ask) / 4
+        self.execute_trade_in_exchange(coin, symbol, Balancer.TRADE_SIDE_LEFT_TO_RIGHT,
+                                       self.second_api, self.first_api, second_ask, first_bid,
+                                       avg_coin_price, radio)
 
-                first_bid = self.get_right(self.first_api, x, first_depth['bids'], 'bid')
-                first_ask = self.get_right(self.first_api, x, first_depth['asks'], 'ask')
-                second_bid = self.get_right(self.second_api, x, second_depth['bids'], 'bid')
-                second_ask = self.get_right(self.second_api, x, second_depth['asks'], 'ask')
+    def trade_from_right_to_left(self, coin, symbol, first_bid, first_ask, second_bid, second_ask, radio):
+        avg_coin_price = (first_bid + first_ask + second_bid + second_ask) / 4
+        self.execute_trade_in_exchange(coin, symbol, Balancer.TRADE_SIDE_RIGHT_TO_LEFT,
+                                       self.first_api, self.second_api, first_ask, second_bid,
+                                       avg_coin_price, radio)
 
-                a = fix_float_radix(first_bid / second_ask)  # 左卖右买
-                b = fix_float_radix(second_bid / first_ask)  # 左买右卖
-                logging.info("策略结果 %s\t%s, 阈值: %s\t%s" % (a, b, self.cur_a, self.cur_b))
-                if not self.debug and x == 'BTC':
-                    self.insert(self.tablename, x, a, b, ts)
-                    #if self.trade_cnt >= 50:
-                    #    logging.info("交易太多次")
-                    if self.has_unfinish_order():
-                        logging.info("有未完成订单")
-                    else:
-                        if a >= self.cur_a:
-                            if self.amount_a - self.amount_b > 0.095:
-                                logging.info("[a]单向操作太多, 停止下单")
-                            else:
-                                self.miss_a = 0
-                                logging.info("[a]准备执行a策略\t%s" % a)
-                                # self.cur_a = (a + self.cur_a) / 2
-                                self.cur_a = a
-                                if balance[1] > 0.001 and balance[2] > 20:
-                                    # second_price = second_ask - 0.0001
-                                    second_price = second_ask
-                                    logging.info("[a]真正执行a策略, price is: %s %s", first_bid, second_price)
-                                    # amount = 0.001
-                                    amount = self._cal_due_amount('a', a)
-                                    sell_record_id = self.order_manager.init_order(self.first_api.id, x, 'sell', amount,
-                                                                                   first_bid)
-                                    buy_record_id = self.order_manager.init_order(self.second_api.id, x, 'buy', amount,
-                                                                                  second_price)
-                                    logging.info("[a]创建订单记录 sell_record_id: %s , buy_record_id %s" % (
-                                        sell_record_id, buy_record_id))
-                                    # sell_order_id = self.first_api.sell_limit(symbol, price=first_bid, amount=amount)
-                                    # buy_order_id = self.second_api.buy_limit(symbol, price=second_price, amount=amount)
+    def execute_trade_in_exchange(self, coin, symbol, trade_side,
+                                  buy_exchange, sell_exchange, buy_price, sell_price,
+                                  avg_price, radio):
+        assert buy_price < sell_price
+        logging.info("[%s]准备执行策略==========\t%s" % (trade_side, radio))
 
-                                    sell_order_id_future = self.pool.submit(self.first_api.sell_limit, symbol,
-                                                                            price=first_bid, amount=amount)
-                                    buy_order_id_future = self.pool.submit(self.second_api.buy_limit, symbol,
-                                                                           price=second_price, amount=amount)
+        # self.cur_b = (b + self.cur_b) / 2
+        self.cur_b = radio
+        coin_amount = self.balancer.get_trade_coin_amount(trade_side)
+        if not self.balancer.can_trade(coin_amount, coin_price=avg_price, side=trade_side):
+            logging.info("执行策略失败, 余额不足")
+            return
 
-                                    sell_order_id = sell_order_id_future.result()
-                                    buy_order_id = buy_order_id_future.result()
+        # second_price = second_bid  + 0.0001
+        assert trade_side in Balancer.TRADE_SIDES
+        logging.info("真正执行策略, price is: buy: %s, sell: %s" % (buy_price, sell_price))
+        buy_record_id = self.order_manager.init_order(self.first_api.id, coin, 'buy', coin_amount,
+                                                      buy_price)
+        sell_record_id = self.order_manager.init_order(self.second_api.id, coin, 'sell',
+                                                       coin_amount,
+                                                       sell_price)
+        logging.info("创建订单记录 buy_record_id: %s , sell_record_id %s" % (
+            buy_record_id, sell_record_id))
 
-                                    logging.info("[a]发送卖单成功 sell_order_id: %s" % sell_order_id)
-                                    logging.info("[a]发送买单成功 buy_order_id: %s" % buy_order_id)
+        buy_order_id_future = self.pool.submit(buy_exchange.buy_limit, symbol,
+                                               price=buy_price, amount=coin_amount)
+        sell_order_id_future = self.pool.submit(sell_exchange.sell_limit, symbol,
+                                                price=sell_price,
+                                                amount=coin_amount)
 
-                                    self.order_manager.update_ex_id(sell_record_id, sell_order_id)
-                                    self.order_manager.update_ex_id(buy_record_id, buy_order_id)
-                                    self.amount_a += amount
-                                    self.trade_cnt += 1
-                                    self.strategy_manager.insert(self.strategy_a_key, sell_record_id, buy_record_id, a,
-                                                                 amount)
-                                    slack("execute a strategy success a: %s" % a)
-                                else:
-                                    logging.info("[a]执行a策略失败, 余额不足")
-                        else:
-                            self.miss_a += 1
-                            if self.miss_a > 9:
-                                self.cur_a = max(a, self.min_a) - 0.0001
-                        if b >= self.cur_b:
-                            if self.amount_b - self.amount_a >= 0.12:
-                                logging.info("[b]单向操作太多, 停止下单")
-                            else:
-                                self.miss_b = 0
-                                logging.info("[b]准备执行b策略\t%s" % b)
-                                # self.cur_b = (b + self.cur_b) / 2
-                                self.cur_b = b
-                                amount = self._cal_due_amount('b', b)
-                                if balance[3] > amount and balance[0] > 20:
-                                    # second_price = second_bid  + 0.0001
-                                    second_price = second_bid
-                                    first_price = first_ask
-                                    logging.info("[b]真正执行b策略, price is: %s %s", first_price, second_price)
-                                    # amount = 0.001
-                                    buy_record_id = self.order_manager.init_order(self.first_api.id, x, 'buy', amount,
-                                                                                  first_price)
-                                    sell_record_id = self.order_manager.init_order(self.second_api.id, x, 'sell',
-                                                                                   amount,
-                                                                                   second_price)
-                                    logging.info("[b]创建订单记录 sell_record_id: %s , buy_record_id %s" % (
-                                        sell_record_id, buy_record_id))
-                                    # buy_order_id = self.first_api.buy_limit(symbol, price=first_ask, amount=amount)
-                                    # sell_order_id = self.second_api.sell_limit(symbol, price=second_price,
-                                    #                                            amount=amount)
+        sell_order_id = sell_order_id_future.result()
+        buy_order_id = buy_order_id_future.result()
 
-                                    buy_order_id_future = self.pool.submit(self.first_api.buy_limit, symbol,
-                                                                           price=first_price, amount=amount)
-                                    sell_order_id_future = self.pool.submit(self.second_api.sell_limit, symbol,
-                                                                            price=second_price,
-                                                                            amount=amount)
+        logging.info("发送买单成功 buy_order_id: %s" % buy_order_id)
+        logging.info("发送卖单成功 sell_order_id: %s" % sell_order_id)
 
-                                    sell_order_id = sell_order_id_future.result()
-                                    buy_order_id = buy_order_id_future.result()
+        self.order_manager.update_ex_id(buy_record_id, buy_order_id)
+        self.order_manager.update_ex_id(sell_record_id, sell_order_id)
 
-                                    logging.info("[b]发送买单成功 buy_order_id: %s" % buy_order_id)
-                                    logging.info("[b]发送卖单成功 sell_order_id: %s" % sell_order_id)
-                                    self.order_manager.update_ex_id(buy_record_id, buy_order_id)
-                                    self.order_manager.update_ex_id(sell_record_id, sell_order_id)
-                                    self.amount_b += amount
-                                    self.trade_cnt += 1
-                                    self.strategy_manager.insert(self.strategy_b_key, buy_record_id, sell_record_id, b,
-                                                                 amount)
-                                    slack("execute b strategy success, b is %s" % b)
-                                else:
-                                    logging.info("[b]执行b策略失败, 余额不足")
-                        else:
-                            self.miss_b += 1
-                            if self.miss_b > 9:
-                                self.cur_b = max(b, self.min_b) - 0.0001
-                        self.refresh_strategy_min_v()
-            except Exception, e:
-                logging.exception("")
+        self.strategy_manager.insert(self.strategy_b_key, buy_record_id, sell_record_id, radio,
+                                     coin_amount)
+        self.balancer.sync_by_trade(coin_amount, coin_price=avg_price, side=trade_side)
+        logging.info("[%s]完成执行策略==========\t%s" % (trade_side, radio))
+
+        slack("[%s] execute strategy success, radio is %s" % (trade_side, radio))
+
+    def _trade(self, coin="BTC"):
+        try:
+            symbol = coin + "_USDT"
+
+            future_first = self.pool.submit(self.first_api.fetch_depth, symbol)
+            future_second = self.pool.submit(self.second_api.fetch_depth, symbol)
+
+            first_depth = future_first.result()
+            second_depth = future_second.result()
+
+            first_bid, first_ask, second_bid, second_ask = self.analyze_price_from_depth(first_depth, second_depth,
+                                                                                         coin)
+
+            a = fix_float_radix(first_bid / second_ask)  # 左卖右买
+            b = fix_float_radix(second_bid / first_ask)  # 左买右卖
+            logging.info("策略结果 %s\t%s, 阈值: %s\t%s" % (a, b, self.cur_a, self.cur_b))
+            if self.debug or coin != 'BTC':
+                return
+
+            self.insert_diff_to_table(coin, a, b)
+            if self.has_unfinish_order():
+                logging.info("有未完成订单")
+            else:
+                if a >= self.cur_a:
+                    self.miss_a = 0
+                    self.trade_from_left_to_right(coin, symbol, first_bid, first_ask, second_bid, second_ask, a)
+                else:
+                    self.miss_a += 1
+                    if self.miss_a > 9:
+                        self.cur_a = max(a - 0.0001, self.min_a)
+                if b >= self.cur_b:
+                    self.miss_b = 0
+                    self.trade_from_right_to_left(coin, symbol, first_bid, first_ask, second_bid, second_ask, b)
+                else:
+                    self.miss_b += 1
+                    if self.miss_b > 9:
+                        self.cur_b = max(b - 0.0001, self.min_b)
+                self.refresh_strategy_min_v()
+        except Exception, e:
+            logging.exception("")
 
 
 @click.command()
