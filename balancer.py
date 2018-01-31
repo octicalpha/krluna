@@ -1,5 +1,6 @@
 # coding: utf8
 
+import logging
 
 class Balancer(object):
     TRADE_SIDE_LEFT_TO_RIGHT = "->"
@@ -67,27 +68,39 @@ class DefaultTwoSideBalancer(Balancer):
         right_radio = self.right_coin / total
 
         l_to_r, r_to_l = self._get_init_threshold()
-        if left_radio < 0.03:  # 左边太少, 需要 left <- right
-            l_to_r += 1
+        if left_radio < 0.02:  # 左边太少, 需要 left <- right
+            l_to_r += 2
         elif left_radio < 0.1:
-            l_to_r += 0.015
+            l_to_r += 0.012
         elif left_radio < 0.2:
-            l_to_r += 0.01
+            l_to_r += 0.008
         elif left_radio < 0.3:
             l_to_r += 0.006
         elif left_radio < 0.4:
+            l_to_r += 0.003
+        elif left_radio < 0.5:
             l_to_r += 0.0025
+        elif left_radio < 0.6:
+            l_to_r += 0.002
+        elif left_radio < 0.7:
+            l_to_r += 0.0015
 
-        if right_radio < 0.03:  # 右边太少, 需要 left -> right
-            r_to_l += 1
+        if right_radio < 0.02:  # 右边太少, 需要 left -> right
+            r_to_l += 2
         elif right_radio < 0.1:
-            r_to_l += 0.015
+            r_to_l += 0.012
         elif right_radio < 0.2:
-            r_to_l += 0.01
+            r_to_l += 0.008
         elif right_radio < 0.3:
             r_to_l += 0.006
         elif right_radio < 0.4:
             r_to_l += 0.0025
+        elif right_radio < 0.5:
+            r_to_l += 0.0025
+        elif right_radio < 0.6:
+            r_to_l += 0.002
+        elif right_radio < 0.7:
+            r_to_l += 0.0015
 
         return l_to_r, r_to_l
 

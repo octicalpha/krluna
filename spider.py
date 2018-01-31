@@ -101,7 +101,7 @@ class TestStrategy(object):
         self.refresh_strategy_min_v()
         while True:
             self._trade("BTC")
-            time.sleep(1.8)
+            time.sleep(2)
 
     def get_right(self, exchange, coin, li, side='bid', amount=None):
         total = 0
@@ -120,7 +120,7 @@ class TestStrategy(object):
         return avg(res)
 
     def has_unfinish_order(self):
-        a = len(self.order_manager.list_by_status(ORDER_STATUS.PLACED)) >= 6
+        a = len(self.order_manager.list_by_status(ORDER_STATUS.PLACED)) >= 8
         if a:
             return a
         a = len(self.order_manager.list_by_status(ORDER_STATUS.INIT)) > 2
@@ -162,9 +162,9 @@ class TestStrategy(object):
         # second_price = second_bid  + 0.0001
         assert trade_side in Balancer.TRADE_SIDES
         logging.info("真正执行策略, price is: buy: %s, sell: %s" % (buy_price, sell_price))
-        buy_record_id = self.order_manager.init_order(self.first_api.id, coin, 'buy', coin_amount,
+        buy_record_id = self.order_manager.init_order(buy_exchange.id, coin, 'buy', coin_amount,
                                                       buy_price)
-        sell_record_id = self.order_manager.init_order(self.second_api.id, coin, 'sell',
+        sell_record_id = self.order_manager.init_order(sell_exchange.id, coin, 'sell',
                                                        coin_amount,
                                                        sell_price)
         logging.info("创建订单记录 buy_record_id: %s , sell_record_id %s" % (
