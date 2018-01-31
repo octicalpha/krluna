@@ -27,7 +27,7 @@ class Tool(object):
 
         self.engine.execute(sql, (json.dumps(acc), cur_ms()))
 
-    def check_benefit(self):
+    def check_benefit(self, origin=False):
         total_usdt = 0
         total_btc = 0
         for k, v in self.exchanges.iteritems():
@@ -40,8 +40,10 @@ class Tool(object):
         init_usdt = 3847.3595346
         init_btc = 0.211667402
 
-        rate = float(self.exchanges['okex'].fetch_ticker('btc_usdt')['ticker']['last'])
-        #rate = 11500
+        if origin:
+            rate = 11500
+        else:
+            rate = float(self.exchanges['okex'].fetch_ticker('btc_usdt')['ticker']['last'])
         return total_usdt - init_usdt, total_btc - init_btc, \
                total_btc * rate + total_usdt - init_btc * rate - init_usdt, \
                total_btc * rate + total_usdt, \
@@ -76,8 +78,9 @@ def record():
 
 
 @cli.command()
-def benefit():
-    print tool.check_benefit()
+@click.option("-o", is_flag=True)
+def benefit(o):
+    print tool.check_benefit(o)
 
 
 @cli.command()
