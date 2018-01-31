@@ -116,11 +116,11 @@ class DefaultTwoSideBalancer(Balancer):
         base = 0.001
         if benefit > 1.04:
             return 0.005
-        if benefit > 1.03:
+        if benefit > 1.028:
             return 0.004
-        elif benefit > 1.02:
+        elif benefit > 1.018:
             return 0.003
-        elif benefit > 1.01:
+        elif benefit > 1.0:
             return 0.002
         else:
             return base
