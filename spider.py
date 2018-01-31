@@ -120,7 +120,7 @@ class TestStrategy(object):
         return avg(res)
 
     def has_unfinish_order(self):
-        a = len(self.order_manager.list_by_status(ORDER_STATUS.PLACED)) >= 8
+        a = len(self.order_manager.list_by_status(ORDER_STATUS.PLACED)) >= 6
         if a:
             return a
         a = len(self.order_manager.list_by_status(ORDER_STATUS.INIT)) > 2
@@ -216,8 +216,8 @@ class TestStrategy(object):
                 return
 
             self.insert_diff_to_table(coin, a, b)
-            if self.has_unfinish_order():
-                logging.info("有未完成订单")
+            if max(a, b) < 1.016 and self.has_unfinish_order():
+                logging.info("利润太小且有未完成订单")
             else:
                 if a >= self.cur_a:
                     self.miss_a = 0
