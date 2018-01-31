@@ -124,8 +124,8 @@ if __name__ == '__main__':
 
     api = Okex()
     # print api.fetch_ticker('eth_usdt')
-    # print api.fetch_depth('eth_usdt')
-    print api.account()
+    print api.fetch_depth('eth_usdt')
+    # print api.account()
     # print api.order('eth_usdt', 'buy', 'limit', 0.1, 10)
     # print api.order_info('eth_usdt', 1000)
     # print api.cancel_order('eth_usdt', 1000)

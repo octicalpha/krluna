@@ -18,6 +18,11 @@ class DefaultTwoSideBalancer(Balancer):
 
         self.trade_cnt = 0
 
+        self.init()
+
+    def init(self):
+        pass
+
     def can_trade(self, amount_coin, amount_money=None, side=Balancer.TRADE_SIDE_LEFT_TO_RIGHT, coin_price=None):
         if amount_money is None:
             assert coin_price is not None
@@ -57,7 +62,7 @@ class DefaultTwoSideBalancer(Balancer):
     def tick(self):
         pass
 
-    def _get_init_threshold(self):
+    def get_init_threshold(self):
         # TODO(zz) 添加根据历史回归判断
         return 1.0055, 1.0055
 
@@ -67,7 +72,7 @@ class DefaultTwoSideBalancer(Balancer):
         left_radio = self.left_coin / total
         right_radio = self.right_coin / total
 
-        l_to_r, r_to_l = self._get_init_threshold()
+        l_to_r, r_to_l = self.get_init_threshold()
         if left_radio < 0.02:  # 左边太少, 需要 left <- right
             l_to_r += 2
         elif left_radio < 0.1:
@@ -121,3 +126,10 @@ class DefaultTwoSideBalancer(Balancer):
         else:
             return base
 
+
+class CrossOneTwoSideBalancer(DefaultTwoSideBalancer):
+    def get_init_threshold(self):
+        super(CrossOneTwoSideBalancer, self).get_init_threshold()
+
+    def get_threshold(self):
+        super(CrossOneTwoSideBalancer, self).get_threshold()

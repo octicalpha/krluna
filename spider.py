@@ -136,14 +136,18 @@ class TestStrategy(object):
 
     def trade_from_left_to_right(self, coin, symbol, first_bid, first_ask, second_bid, second_ask, radio):
         avg_coin_price = (first_bid + first_ask + second_bid + second_ask) / 4
+        buy_price = second_ask
+        sell_price = first_bid
         self.execute_trade_in_exchange(coin, symbol, Balancer.TRADE_SIDE_LEFT_TO_RIGHT,
-                                       self.second_api, self.first_api, second_ask, first_bid,
+                                       self.second_api, self.first_api, buy_price, sell_price,
                                        avg_coin_price, radio)
 
     def trade_from_right_to_left(self, coin, symbol, first_bid, first_ask, second_bid, second_ask, radio):
         avg_coin_price = (first_bid + first_ask + second_bid + second_ask) / 4
+        buy_price = first_ask
+        sell_price = second_bid
         self.execute_trade_in_exchange(coin, symbol, Balancer.TRADE_SIDE_RIGHT_TO_LEFT,
-                                       self.first_api, self.second_api, first_ask, second_bid,
+                                       self.first_api, self.second_api, buy_price, sell_price,
                                        avg_coin_price, radio)
 
     def execute_trade_in_exchange(self, coin, symbol, trade_side,
