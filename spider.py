@@ -158,7 +158,7 @@ class TestStrategy(object):
 
         # self.cur_b = (b + self.cur_b) / 2
         self.cur_b = radio
-        coin_amount = self.balancer.get_trade_coin_amount(trade_side)
+        coin_amount = self.balancer.get_trade_coin_amount(trade_side, radio)
         if not self.balancer.can_trade(coin_amount, coin_price=avg_price, side=trade_side):
             logging.info("执行策略失败, 余额不足")
             return

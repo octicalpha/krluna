@@ -2,6 +2,7 @@
 
 import logging
 
+
 class Balancer(object):
     TRADE_SIDE_LEFT_TO_RIGHT = "->"
     TRADE_SIDE_RIGHT_TO_LEFT = "<-"
@@ -109,19 +110,17 @@ class DefaultTwoSideBalancer(Balancer):
 
         return l_to_r, r_to_l
 
-    def get_trade_coin_amount(self, side):
+    def get_trade_coin_amount(self, side, benefit):
         assert side in Balancer.TRADE_SIDES
 
-        total = self.left_coin + self.right_coin
-        left_radio = self.left_coin / total
-        right_radio = self.right_coin / total
-
         base = 0.001
-        if left_radio < 0.1 or right_radio < 0.1:
+        if benefit > 1.04:
+            return 0.005
+        if benefit > 1.03:
             return 0.004
-        elif left_radio < 0.25 or right_radio < 0.25:
+        elif benefit > 1.02:
             return 0.003
-        elif left_radio < 0.4 or right_radio < 0.4:
+        elif benefit > 1.01:
             return 0.002
         else:
             return base
