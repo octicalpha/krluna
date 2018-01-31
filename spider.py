@@ -10,7 +10,7 @@ from order import *
 import os
 from util import slack, cur_ms
 from concurrent.futures import ThreadPoolExecutor, wait, as_completed
-from balancer import DefaultTwoSideBalancer, Balancer
+from balancer import DefaultTwoSideBalancer, Balancer, NightSleepTwoSideBalancer
 
 AMOUNT_THRESHOLD = {
     "BTC": 0.001,
@@ -91,7 +91,7 @@ class TestStrategy(object):
         self.second_api = self.exchanges.get(second)
         first_account = self.accounts.get(first)
         second_account = self.accounts.get(second)
-        self.balancer = DefaultTwoSideBalancer(
+        self.balancer = NightSleepTwoSideBalancer(
             first_account.get_avail("btc"), first_account.get_avail("usdt"),
             second_account.get_avail("btc"), second_account.get_avail("usdt")
         )

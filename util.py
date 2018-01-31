@@ -1,6 +1,7 @@
 # coding: utf8
 
 import os
+import heapq
 import arrow
 import time
 import requests
@@ -30,6 +31,10 @@ def ms_to_str(ms):
         return ''
     return arrow.get(int(ms) / 1000).to('local').format("YYYY-MM-DD HH:mm:ss")
 
+def top(li, percent=0.1):
+    x = min(int(len(li) * percent), 50)
+
+    return min(heapq.nlargest(x, li))
 
 def ms_to_humanize(ms):
     if ms <= 0:

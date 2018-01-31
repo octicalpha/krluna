@@ -2,6 +2,10 @@
 
 import logging
 
+import arrow
+
+from util import top
+
 
 class Balancer(object):
     TRADE_SIDE_LEFT_TO_RIGHT = "->"
@@ -19,7 +23,7 @@ class DefaultTwoSideBalancer(Balancer):
 
         self.trade_cnt = 0
 
-        self.init()
+        self.tick_cnt = 0
 
     def init(self):
         pass
@@ -69,6 +73,9 @@ class DefaultTwoSideBalancer(Balancer):
 
     def get_threshold(self):
         # TODO(zz) 根据历史情况决定值, 否则会错过大机会
+
+        self.tick_cnt += 1
+
         total = self.left_coin + self.right_coin
         left_radio = self.left_coin / total
         right_radio = self.right_coin / total
@@ -126,9 +133,22 @@ class DefaultTwoSideBalancer(Balancer):
             return base
 
 
+class NightSleepTwoSideBalancer(DefaultTwoSideBalancer):
+    '''
+    凌晨交易稀少
+    '''
+
+    def get_init_threshold(self):
+        now = arrow.now().to('local')
+        if 0 < now.hour < 7:
+            return 1.004, 1.004
+        else:
+            return super(NightSleepTwoSideBalancer, self).get_init_threshold()
+
+
 class CrossOneTwoSideBalancer(DefaultTwoSideBalancer):
     def get_init_threshold(self):
-        super(CrossOneTwoSideBalancer, self).get_init_threshold()
+        return super(CrossOneTwoSideBalancer, self).get_init_threshold()
 
     def get_threshold(self):
-        super(CrossOneTwoSideBalancer, self).get_threshold()
+        return super(CrossOneTwoSideBalancer, self).get_threshold()

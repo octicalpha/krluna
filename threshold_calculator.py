@@ -1,14 +1,6 @@
 # coding: utf8
 
-import heapq
-
-from util import cur_ms
-
-
-def top(li, percent=0.1):
-    x = min(int(len(li) * percent), 50)
-
-    return min(heapq.nlargest(x, li))
+from util import cur_ms, top
 
 
 class ThresholdCalculator(object):
