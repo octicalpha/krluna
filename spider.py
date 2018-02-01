@@ -11,7 +11,7 @@ import os
 import time
 from util import slack, cur_ms, avg, fix_float_radix
 from concurrent.futures import ThreadPoolExecutor, wait, as_completed
-from balancer import DefaultTwoSideBalancer, Balancer, NightSleepTwoSideBalancer
+from balancer import DefaultTwoSideBalancer, Balancer, NightSleepTwoSideBalancer, BackSeeTwoSideBalancer
 
 AMOUNT_THRESHOLD = {
     "BTC": 0.001,
@@ -110,11 +110,11 @@ class TestStrategy(object):
         self.second_api = self.exchanges.get(second)
         first_account = self.accounts.get(first)
         second_account = self.accounts.get(second)
-        self.balancer = NightSleepTwoSideBalancer(
+        self.diff_tablename = 'diff_%s_%s' % (first, second)
+        self.balancer = BackSeeTwoSideBalancer(
             first_account.get_avail("btc"), first_account.get_avail("usdt"),
             second_account.get_avail("btc"), second_account.get_avail("usdt")
-        )
-        self.diff_tablename = 'diff_%s_%s' % (first, second)
+        ).init(self.engine, self.diff_tablename)
         self.strategy_a_key = '%s_%s_%s' % (first, second, 'a')
         self.strategy_b_key = '%s_%s_%s' % (first, second, 'b')
         self.refresh_strategy_min_v()

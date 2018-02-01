@@ -4,7 +4,7 @@ import logging
 
 import arrow
 
-from util import top
+from util import top, cur_ms
 
 
 class Balancer(object):
@@ -84,36 +84,36 @@ class DefaultTwoSideBalancer(Balancer):
         if left_radio < 0.02:  # 左边太少, 需要 left <- right
             l_to_r += 2
         elif left_radio < 0.1:
-            l_to_r += 0.012
+            l_to_r += 0.007
         elif left_radio < 0.2:
-            l_to_r += 0.008
+            l_to_r += 0.004
         elif left_radio < 0.3:
-            l_to_r += 0.006
-        elif left_radio < 0.4:
             l_to_r += 0.003
-        elif left_radio < 0.5:
+        elif left_radio < 0.4:
             l_to_r += 0.0025
-        elif left_radio < 0.6:
+        elif left_radio < 0.5:
             l_to_r += 0.002
-        elif left_radio < 0.7:
+        elif left_radio < 0.6:
             l_to_r += 0.0015
+        elif left_radio < 0.7:
+            l_to_r += 0.001
 
         if right_radio < 0.02:  # 右边太少, 需要 left -> right
             r_to_l += 2
         elif right_radio < 0.1:
-            r_to_l += 0.012
+            r_to_l += 0.007
         elif right_radio < 0.2:
-            r_to_l += 0.008
+            r_to_l += 0.004
         elif right_radio < 0.3:
-            r_to_l += 0.006
+            r_to_l += 0.003
         elif right_radio < 0.4:
             r_to_l += 0.0025
         elif right_radio < 0.5:
-            r_to_l += 0.0025
-        elif right_radio < 0.6:
             r_to_l += 0.002
-        elif right_radio < 0.7:
+        elif right_radio < 0.6:
             r_to_l += 0.0015
+        elif right_radio < 0.7:
+            r_to_l += 0.001
 
         return l_to_r, r_to_l
 
@@ -140,11 +140,62 @@ class NightSleepTwoSideBalancer(DefaultTwoSideBalancer):
 
     def get_init_threshold(self):
         now = arrow.now().to('local')
-        if 0 < now.hour < 7:
+        if now.hour < 7 or now.hour >= 20:
             return 1.004, 1.004
         else:
             return super(NightSleepTwoSideBalancer, self).get_init_threshold()
 
+class BackSeeTwoSideBalancer(DefaultTwoSideBalancer):
+    '''
+    看最近最大差价, 如果太小, 那么要动态调整基础值, 提高交易量
+    '''
+
+    def init(self, engine, diff_table_name, coin="BTC"):
+        self.engine = engine
+        self.diff_table_name = diff_table_name
+        self.last_fetch_ts = 0
+
+        self.min_threshold = 1.0035 # 暂时还不支持回撤方式
+
+        self.last_init_l_to_r = 1.0055
+        self.last_init_r_to_l = 1.0055
+
+        self.coin = coin
+
+        return self
+
+    def _get_base_thres_by_window(self, strategy, ts, limit):
+        sql = "select " + strategy + " from " + self.diff_table_name + " where coin=? and ts > ? order by " + strategy + " desc limit ?"
+        logging.info(sql)
+        res = self.engine.fetch(sql, (self.coin, ts, limit))
+        return float(res[-1][0])
+
+    def refresh_back_context(self):
+        now = cur_ms()
+        if now - self.last_fetch_ts < 3 * 60 * 1000: # 3min one time
+            return False, None 
+        now = arrow.now().to('local')
+        res = []
+        for strategy in ('ab', 'ba'):
+            big_window = self._get_base_thres_by_window(strategy, now.shift(hours=-2).timestamp * 1000, 40)
+            mid_window = self._get_base_thres_by_window(strategy, now.shift(hours=-1).timestamp * 1000, 25)
+            small_window = self._get_base_thres_by_window(strategy, now.shift(minutes=-5).timestamp * 1000, 5)
+            estimate_thres = (big_window * 2 + mid_window * 3 + small_window * 5) / 10
+            res.append(estimate_thres)
+        logging.info("back see threshold %s" % res)
+        self.last_fetch_ts = cur_ms()
+        return True, res 
+
+    def get_init_threshold(self):
+        refresh, res = self.refresh_back_context()
+        if not refresh:
+            return self.last_init_l_to_r, self.last_init_r_to_l
+        else:
+            if res[0] < self.last_init_l_to_r: # 暂时不增大基础值, 后续需要改进
+                self.last_init_l_to_r = max(self.min_threshold, res[0])
+            if res[1] < self.last_init_r_to_l:
+                self.last_init_r_to_l = max(self.min_threshold, res[1])
+        return self.last_init_l_to_r, self.last_init_r_to_l
 
 class CrossOneTwoSideBalancer(DefaultTwoSideBalancer):
     def get_init_threshold(self):

@@ -14,7 +14,7 @@ import tornado.web
 
 from skyb.model import MysqlEngine
 from order import *
-from util import ms_to_str, ms_to_humanize
+from util import ms_to_str, ms_to_humanize, top
 
 
 class ApiApplication(BaseApplication):
@@ -34,12 +34,6 @@ class ApiApplication(BaseApplication):
         self.engine = MysqlEngine(config['db']['url'])
         self.order_manager = OrderManager(self.engine)
         super(ApiApplication, self).__init__(handlers, **settings)
-
-
-def top(li, percent=0.1):
-    x = min(int(len(li) * percent), 50)
-
-    return min(heapq.nlargest(x, li))
 
 
 class OrderHandler(tornado.web.RequestHandler):
