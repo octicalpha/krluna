@@ -6,6 +6,7 @@ from exchange import *
 from skyb import MysqlEngine
 import click
 from order import StrategyManager
+from exchange.model import Account
 
 
 class Tool(object):
@@ -38,20 +39,27 @@ class Tool(object):
 
         # sql = "select * from `account` order by id limit 1"
         # baseline  1/28 19:00
-        #init_usdt = 1057.17674094 + 2783.4295696
-        #init_btc = 0.115674402 + 0.096944
-        init_usdt = 2100.72694018 + 1688.17922997
-        init_btc = 0.0214174019997 + 0.202096
+        # base_usdt = 1057.17674094 + 2783.4295696
+        # base_btc = 0.115674402 + 0.096944
+        # base_usdt = 2100.72694018 + 1688.17922997
+        # base_btc = 0.0214174019997 + 0.202096
+
+        row = json.loads(self.engine.fetchone_row("select * from `account` order by id desc limit 1", ())['value'])
+        base_usdt, base_btc = 0, 0
+        for k, v in row.iteritems():
+            acc = Account.parse_from_str(v)
+            base_usdt += acc.get_avail("usdt") + acc.get_freeze('usdt')
+            base_btc += acc.get_avail("btc") + acc.get_freeze('btc')
 
         if origin:
             rate = 11000
         else:
             rate = float(self.exchanges['okex'].fetch_ticker('btc_usdt')['ticker']['last'])
-        return total_usdt - init_usdt, total_btc - init_btc, \
-               total_btc * rate + total_usdt - init_btc * rate - init_usdt, \
+        return total_usdt - base_usdt, total_btc - base_btc, \
+               total_btc * rate + total_usdt - base_btc * rate - base_usdt, \
                total_btc * rate + total_usdt, \
                str(fix_float_radix(
-                   100 * (total_btc * rate + total_usdt - init_btc * rate - init_usdt) / (init_btc * rate + init_usdt),
+                   100 * (total_btc * rate + total_usdt - base_btc * rate - base_usdt) / (base_btc * rate + base_usdt),
                    2)) + '%'
 
     def cancel_order(self, exchange, id, symbol):

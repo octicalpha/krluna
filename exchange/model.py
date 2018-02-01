@@ -67,6 +67,14 @@ class Account(object):
 
     __repr__ = __str__
 
+    @classmethod
+    def parse_from_str(cls, s):
+        assets = [x.strip() for x in s[s.find('|') + 1:].split(',')]
+        acc = Account()
+        for x in assets:
+            acc.add(Asset.parse_from_str(x))
+        return acc
+
 
 class Asset(object):
     def __init__(self, coin, avail, freeze):
@@ -78,6 +86,11 @@ class Asset(object):
         return '<Asset %s|%s|%s>' % (self.coin, self.avail, self.freeze)
 
     __repr__ = __str__
+
+    @classmethod
+    def parse_from_str(cls, s):
+        coin, avail, freeze = s[s.find('Asset ') + 6:-1].split('|')
+        return Asset(coin, float(avail), float(freeze))
 
 
 class Order(object):
@@ -92,6 +105,6 @@ class Order(object):
 
     def __str__(self):
         return "<Order %s|%s|%s|%s|%s|%s|%s>" % (
-        self.id, ORDER_STATUS.from_code(self.status), self.symbol, self.price, self.amount, self.ts, self.side)
+            self.id, ORDER_STATUS.from_code(self.status), self.symbol, self.price, self.amount, self.ts, self.side)
 
     __repr__ = __str__
