@@ -168,6 +168,8 @@ class BackSeeTwoSideBalancer(DefaultTwoSideBalancer):
         sql = "select " + strategy + " from " + self.diff_table_name + " where coin=? and ts > ? order by " + strategy + " desc limit ?"
         logging.info(sql)
         res = self.engine.fetch(sql, (self.coin, ts, limit))
+        if len(res) == 0:
+            return 0
         return float(res[-1][0])
 
     def refresh_back_context(self):
@@ -181,6 +183,8 @@ class BackSeeTwoSideBalancer(DefaultTwoSideBalancer):
             mid_window = self._get_base_thres_by_window(strategy, now.shift(hours=-1).timestamp * 1000, 25)
             small_window = self._get_base_thres_by_window(strategy, now.shift(minutes=-5).timestamp * 1000, 5)
             estimate_thres = (big_window * 2 + mid_window * 3 + small_window * 5) / 10
+            if estimate_thres < 0.8:
+                return False, None
             res.append(estimate_thres)
         logging.info("back see threshold %s" % res)
         self.last_fetch_ts = cur_ms()

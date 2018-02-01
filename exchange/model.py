@@ -32,20 +32,27 @@ class Account(object):
         self.exchange = exchange
         self.assets = {}
 
+    def _tran_coin_name(self, c):
+        return c.lower()
+
     def add(self, asset):
-        self.assets[asset.coin] = asset
+        coin = self._tran_coin_name(asset.coin)
+        self.assets[coin] = asset
 
     def get_avail(self, coin):
+        coin = self._tran_coin_name(coin)
         if coin not in self.assets:
             return 0
         return self.assets[coin].avail
 
     def get_freeze(self, coin):
+        coin = self._tran_coin_name(coin)
         if coin not in self.assets:
             return 0
         return self.assets[coin].freeze
 
     def set_avail(self, coin, amount):
+        coin = self._tran_coin_name(coin)
         if coin not in self.assets:
             asset = Asset(coin, amount, 0)
             self.add(asset)
@@ -54,6 +61,7 @@ class Account(object):
         return self
 
     def set_freeze(self, coin, amount):
+        coin = self._tran_coin_name(coin)
         if coin not in self.assets:
             asset = Asset(coin, 0, amount)
             self.add(asset)

@@ -50,9 +50,6 @@ class MakerPriceChooser(PriceChooser):
 
 
 class TestStrategy(object):
-    # CHECK_COINS = ['BTC', 'ETH', 'LTC', 'ETC', 'XRP', 'EOS']
-    CHECK_COINS = ['BTC']
-
     def __init__(self, config, debug=True):
         key_config = config['apikey']
         self.debug = debug
@@ -105,21 +102,21 @@ class TestStrategy(object):
         sql = "insert into " + self.diff_tablename + " (coin, ab, ba, ts) values (?, ?, ?, ?)"
         self.engine.execute(sql, (coin, a, b, cur_ms()))
 
-    def trade(self, first, second):
+    def trade(self, first, second, coin="BTC"):
         self.first_api = self.exchanges.get(first)
         self.second_api = self.exchanges.get(second)
         first_account = self.accounts.get(first)
         second_account = self.accounts.get(second)
         self.diff_tablename = 'diff_%s_%s' % (first, second)
         self.balancer = BackSeeTwoSideBalancer(
-            first_account.get_avail("btc"), first_account.get_avail("usdt"),
-            second_account.get_avail("btc"), second_account.get_avail("usdt")
+            first_account.get_avail(coin), first_account.get_avail("usdt"),
+            second_account.get_avail(coin), second_account.get_avail("usdt")
         ).init(self.engine, self.diff_tablename)
         self.strategy_a_key = '%s_%s_%s' % (first, second, 'a')
         self.strategy_b_key = '%s_%s_%s' % (first, second, 'b')
         self.refresh_strategy_min_v()
         while True:
-            self._trade("BTC")
+            self._trade(coin)
             time.sleep(2)
 
     def get_right(self, exchange, coin, li, side='bid', amount=None):
@@ -214,9 +211,9 @@ class TestStrategy(object):
 
         slack("[%s] execute strategy success, radio is %s" % (trade_side, radio))
 
-    def _trade(self, coin="BTC"):
+    def _trade(self, coin):
         try:
-            symbol = coin + "_USDT"
+            symbol = (coin + "_USDT").upper()
 
             future_first = self.pool.submit(self.first_api.fetch_depth, symbol)
             future_second = self.pool.submit(self.second_api.fetch_depth, symbol)
@@ -234,7 +231,7 @@ class TestStrategy(object):
             b = fix_float_radix(right_sell_price / left_buy_price)  # 左买右卖
 
             logging.info("策略结果 %s\t%s, 阈值: %s\t%s" % (a, b, self.cur_a, self.cur_b))
-            if self.debug or coin != 'BTC':
+            if self.debug:
                 return
 
             self.insert_diff_to_table(coin, a, b)
@@ -263,8 +260,9 @@ class TestStrategy(object):
 @click.command()
 @click.option("--first", default="zb")
 @click.option("--second", default="okex")
+@click.option("--coin", default="BTC")
 @click.option("-d", "--debug", is_flag=True)
-def main(first, second, debug):
+def main(first, second, coin, debug):
     if debug:
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     else:
@@ -272,7 +270,7 @@ def main(first, second, debug):
                             filename="strategy.log")
     from util import read_conf
     config = read_conf("./config.json")
-    TestStrategy(config, debug).trade(first, second)
+    TestStrategy(config, debug).trade(first, second, coin)
 
 
 if __name__ == '__main__':
