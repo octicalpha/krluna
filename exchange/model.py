@@ -69,8 +69,8 @@ class Account(object):
 
     @classmethod
     def parse_from_str(cls, s):
-        assets = [x.strip() for x in s[s.find('|') + 1:].split(',')]
-        acc = Account()
+        assets = [x.strip() for x in s[s.find('|') + 1:-1].split(',')]
+        acc = Account(None)
         for x in assets:
             acc.add(Asset.parse_from_str(x))
         return acc
