@@ -59,8 +59,6 @@ class Test(object):
         }
 
         self.engine = MysqlEngine(config['db']['url'])
-        self.order_manager = OrderManager(self.engine)
-        self.accounts = {}
         self.pool = ThreadPoolExecutor(3)  # for many urls, this should probably be capped at some value.
 
         self.async = False
