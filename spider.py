@@ -8,7 +8,8 @@ import simplejson as json
 from exchange import *
 from order import *
 import os
-from util import slack, cur_ms
+import time
+from util import slack, cur_ms, avg, fix_float_radix
 from concurrent.futures import ThreadPoolExecutor, wait, as_completed
 from balancer import DefaultTwoSideBalancer, Balancer, NightSleepTwoSideBalancer
 
@@ -22,15 +23,30 @@ AMOUNT_THRESHOLD = {
 }
 
 
-def fix_float_radix(f):
-    return float('%.4f' % f)
+class PriceChooser(object):
+    def choose(self, left_bid, left_ask, right_bid, right_ask):
+        """
+        :param left_bid:
+        :param left_ask:
+        :param right_bid:
+        :param right_ask:
+        :return: (left_buy_price, left_sell_price, right_buy_price, right_sell_price)
+        """
+        raise NotImplementedError
 
 
-import time
+class TakerPriceChooser(PriceChooser):
+    def choose(self, left_bid, left_ask, right_bid, right_ask):
+        return left_ask, left_bid, right_ask, right_bid
 
 
-def avg(li):
-    return sum(li) / len(li)
+class MakerPriceChooser(PriceChooser):
+    def __init__(self, delta_price):
+        self.delta_price = delta_price
+
+    def choose(self, left_bid, left_ask, right_bid, right_ask):
+        return left_bid + self.delta_price, left_bid - self.delta_price, \
+               right_bid + self.delta_price, right_ask - self.delta_price
 
 
 class TestStrategy(object):
@@ -64,6 +80,9 @@ class TestStrategy(object):
         self.accounts = {}
         self.balancer = None
         self.init_balancer()
+
+        self.price_chooser = TakerPriceChooser()
+        # self.price_chooser = MakerPriceChooser(0.0001)
 
     def refresh_strategy_min_v(self):
         self.min_a, self.min_b = self.balancer.get_threshold()
@@ -134,18 +153,14 @@ class TestStrategy(object):
 
         return first_bid, first_ask, second_bid, second_ask
 
-    def trade_from_left_to_right(self, coin, symbol, first_bid, first_ask, second_bid, second_ask, radio):
-        avg_coin_price = (first_bid + first_ask + second_bid + second_ask) / 4
-        buy_price = second_ask
-        sell_price = first_bid
+    def trade_from_left_to_right(self, coin, symbol, buy_price, sell_price, radio):
+        avg_coin_price = (buy_price + sell_price) / 2
         self.execute_trade_in_exchange(coin, symbol, Balancer.TRADE_SIDE_LEFT_TO_RIGHT,
                                        self.second_api, self.first_api, buy_price, sell_price,
                                        avg_coin_price, radio)
 
-    def trade_from_right_to_left(self, coin, symbol, first_bid, first_ask, second_bid, second_ask, radio):
-        avg_coin_price = (first_bid + first_ask + second_bid + second_ask) / 4
-        buy_price = first_ask
-        sell_price = second_bid
+    def trade_from_right_to_left(self, coin, symbol, buy_price, sell_price, radio):
+        avg_coin_price = (buy_price + sell_price) / 2
         self.execute_trade_in_exchange(coin, symbol, Balancer.TRADE_SIDE_RIGHT_TO_LEFT,
                                        self.first_api, self.second_api, buy_price, sell_price,
                                        avg_coin_price, radio)
@@ -189,7 +204,10 @@ class TestStrategy(object):
         self.order_manager.update_ex_id(buy_record_id, buy_order_id)
         self.order_manager.update_ex_id(sell_record_id, sell_order_id)
 
-        self.strategy_manager.insert(self.strategy_b_key, buy_record_id, sell_record_id, radio,
+        strategy_key = self.strategy_b_key
+        if trade_side == Balancer.TRADE_SIDE_LEFT_TO_RIGHT:
+            strategy_key = self.strategy_a_key
+        self.strategy_manager.insert(strategy_key, buy_record_id, sell_record_id, radio,
                                      coin_amount)
         self.balancer.sync_by_trade(coin_amount, coin_price=avg_price, side=trade_side)
         logging.info("[%s]完成执行策略==========\t%s" % (trade_side, radio))
@@ -209,8 +227,12 @@ class TestStrategy(object):
             first_bid, first_ask, second_bid, second_ask = self.analyze_price_from_depth(first_depth, second_depth,
                                                                                          coin)
 
-            a = fix_float_radix(first_bid / second_ask)  # 左卖右买
-            b = fix_float_radix(second_bid / first_ask)  # 左买右卖
+            left_buy_price, left_sell_price, right_buy_price, right_sell_price = \
+                self.price_chooser.choose(first_bid, first_ask, second_bid, second_ask)
+
+            a = fix_float_radix(left_sell_price / right_buy_price)  # 左卖右买
+            b = fix_float_radix(right_sell_price / left_buy_price)  # 左买右卖
+
             logging.info("策略结果 %s\t%s, 阈值: %s\t%s" % (a, b, self.cur_a, self.cur_b))
             if self.debug or coin != 'BTC':
                 return
@@ -221,14 +243,14 @@ class TestStrategy(object):
             else:
                 if a >= self.cur_a:
                     self.miss_a = 0
-                    self.trade_from_left_to_right(coin, symbol, first_bid, first_ask, second_bid, second_ask, a)
+                    self.trade_from_left_to_right(coin, symbol, right_buy_price, left_sell_price, a)
                 else:
                     self.miss_a += 1
                     if self.miss_a > 9:
                         self.cur_a = max(a - 0.0001, self.min_a)
                 if b >= self.cur_b:
                     self.miss_b = 0
-                    self.trade_from_right_to_left(coin, symbol, first_bid, first_ask, second_bid, second_ask, b)
+                    self.trade_from_right_to_left(coin, symbol, left_buy_price, right_sell_price, b)
                 else:
                     self.miss_b += 1
                     if self.miss_b > 9:
@@ -243,11 +265,15 @@ class TestStrategy(object):
 @click.option("--second", default="okex")
 @click.option("-d", "--debug", is_flag=True)
 def main(first, second, debug):
+    if debug:
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    else:
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
+                            filename="strategy.log")
     from util import read_conf
     config = read_conf("./config.json")
     TestStrategy(config, debug).trade(first, second)
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', filename="strategy.log")
     main()

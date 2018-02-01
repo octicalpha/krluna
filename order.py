@@ -47,13 +47,6 @@ class StrategyManager(object):
         a = self.engine.execute(sql, (name, first_order_id, second_order_id, benefit, amount, cur_ms()))
         return a.lastrowid
 
-    def get_sum_amount_by_name(self, name):
-        sql = "select sum(amount) from `strategy` where name = ?"
-        a = self.engine.fetchone(sql, (name,))[0]
-        if not a:
-            return 0
-        return a
-
     def list_by_status(self, sta):
         sql = "select * from `strategy` where status = ?"
         return self.engine.fetch_row(sql, (sta,))
