@@ -37,11 +37,14 @@ class Tool(object):
             print v.id, acc.get_avail("usdt") + acc.get_freeze('usdt'), acc.get_avail("btc") + acc.get_freeze('btc')
 
         # sql = "select * from `account` order by id limit 1"
-        init_usdt = 3847.3595346
-        init_btc = 0.211667402
+        # baseline  1/28 19:00
+        #init_usdt = 1057.17674094 + 2783.4295696
+        #init_btc = 0.115674402 + 0.096944
+        init_usdt = 2100.72694018 + 1688.17922997
+        init_btc = 0.0214174019997 + 0.202096
 
         if origin:
-            rate = 11500
+            rate = 11000
         else:
             rate = float(self.exchanges['okex'].fetch_ticker('btc_usdt')['ticker']['last'])
         return total_usdt - init_usdt, total_btc - init_btc, \
