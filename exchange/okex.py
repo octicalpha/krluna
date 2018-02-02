@@ -1,5 +1,6 @@
 # coding: utf8
 import simplejson as json
+import time
 import six
 import requests
 import traceback
@@ -17,7 +18,11 @@ class Okex(Exchange):
     def fetch_ticker(self, symbol):
         symbol = symbol.lower()
         endpoint = '%s?symbol=%s' % ('/api/v1/ticker.do', symbol)
-        return self.get(endpoint)
+        res = self.get(endpoint)
+        return self._parse_ticker(res)
+
+    def _parse_ticker(self, data):
+        return Ticker(data['ticker']['buy'], data['ticker']['sell'], data['ticker']['last'], seconds=data['date'])
 
     def fetch_depth(self, symbol):
         symbol = symbol.lower()
@@ -98,7 +103,7 @@ class Okex(Exchange):
             'order_id': order_id
         }
         params['sign'] = self.sign(params)
-        
+
         return self._parser_order(self.post(endpoint, params))
 
     def _parser_order(self, data):
@@ -123,8 +128,10 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
     api = Okex()
-    # print api.fetch_ticker('eth_usdt')
-    print api.fetch_depth('eth_usdt')
+    a = api.fetch_ticker('eth_usdt')
+    print a
+    print time.time() - a.seconds
+    # print api.fetch_depth('eth_usdt')
     # print api.account()
     # print api.order('eth_usdt', 'buy', 'limit', 0.1, 10)
     # print api.order_info('eth_usdt', 1000)

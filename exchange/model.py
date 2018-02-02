@@ -116,3 +116,22 @@ class Order(object):
             self.id, ORDER_STATUS.from_code(self.status), self.symbol, self.price, self.amount, self.ts, self.side)
 
     __repr__ = __str__
+
+
+class Ticker(object):
+    def __init__(self, bid, ask, price, ms=None, seconds=None):
+        self.bid = float(bid)
+        self.ask = float(ask)
+        self.price = float(price)
+        if ms is not None:
+            self.ms = int(float(ms))
+            self.seconds = self.ms / 1000
+        else:
+            assert seconds is not None
+            self.seconds = int(float(seconds))
+            self.ms = int(float(seconds) * 1000)
+
+    def __str__(self):
+        return "<Ticker %s|%s|%s|%s>" % (self.bid, self.ask, self.price, self.ms)
+
+    __repr__ = __str__

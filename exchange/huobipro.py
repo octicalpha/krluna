@@ -16,9 +16,11 @@ class Huobipro(Exchange):
         self.sign_hostname = "api.huobi.pro"
         self.acc_id = self._get_account_id()
 
+    def __trasfer_symbol(self, s):
+        return s.replace("_", "").lower()
+
     def fetch_depth(self, symbol):
-        symbol = symbol.replace("_", "")
-        symbol = symbol.lower()
+        symbol = self.__trasfer_symbol(symbol)
         endpoint = '/market/depth'
         params = {
             "symbol": symbol,
@@ -27,7 +29,12 @@ class Huobipro(Exchange):
         return self.get(endpoint, data=params)['tick']
 
     def fetch_ticker(self, symbol):
-        pass
+        symbol = self.__trasfer_symbol(symbol)
+        endpoint = '/market/detail/merged'
+        params = {
+            "symbol": symbol,
+        }
+        return self.get(endpoint, data=params)['tick']
 
     def sign(self, params, method, request_path):
         sorted_params = sorted(params.items(), key=lambda d: d[0], reverse=False)
@@ -123,7 +130,9 @@ class Huobipro(Exchange):
             status = ORDER_STATUS.SUCCESS
         elif state == 'canceled':
             status = ORDER_STATUS.CANCELLED
-        return Order(data['id'], data['symbol'], data['price'], data['amount'], data['created-at'], data['type'].split("-")[0], status)
+        return Order(data['id'], data['symbol'], data['price'], data['amount'], data['created-at'],
+                     data['type'].split("-")[0], status)
+
 
 if __name__ == '__main__':
     import os, sys
@@ -135,4 +144,5 @@ if __name__ == '__main__':
     api = Huobipro(conf['apikey']['huobipro']['key'], conf['apikey']['huobipro']['secret'])
     # print api.fetch_depth("eth_usdt")
     # print api.account()
-    print api.order("btc_usdt", "buy", amount=0.001, price=7000)
+    # print api.order("btc_usdt", "buy", amount=0.001, price=7000)
+    print api.fetch_ticker("btc_usdt")
