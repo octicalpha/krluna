@@ -163,14 +163,24 @@ class AbsDiffHandler(tornado.web.RequestHandler):
         #     'data': [[x.ts, x.trade_ask - x.base_ask] for x in data]
         # })
         series.append({
-            'name': 'base_price',
+            'name': 'base',
             'type': 'line',
-            'data': [[x.ts, x.base_price] for x in data]
+            'data': [[x.ts, x.base_price] for x in data],
         })
         series.append({
-            'name': 'trade_price',
+            'name': 'price',
             'type': 'line',
-            'data': [[x.ts, float(x.trade_price) - 40] for x in data]
+            'data': [[x.ts, float(x.trade_price)] for x in data]
+        })
+        series.append({
+            'name': 'bid',
+            'type': 'line',
+            'data': [[x.ts, float(x.trade_bid)] for x in data]
+        })
+        series.append({
+            'name': 'ask',
+            'type': 'line',
+            'data': [[x.ts, float(x.trade_ask)] for x in data]
         })
         option['series'] = series
 
