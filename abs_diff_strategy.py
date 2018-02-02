@@ -57,13 +57,13 @@ class AbsDiffStrategy(object):
         base_ticker = future_base_ticker.result()
         trade_ticker = future_trade_ticker.result()
 
-        now = cur_ms()
-        if abs(now - trade_ticker.ms) > self.max_miss_ms:
-            logging.warn("%s ticker 过期, %s" % (base_exchange.id, now - trade_ticker.ms))
-            return
-        if abs(now - base_ticker.ms) > self.max_miss_ms:
-            logging.warn("%s ticker 过期, %s" % (base_exchange.id, now - base_ticker.ms))
-            return
+        # now = cur_ms()
+        # if abs(now - trade_ticker.ms) > self.max_miss_ms:
+        #     logging.warn("%s ticker 过期, %s" % (base_exchange.id, now - trade_ticker.ms))
+        #     return
+        # if abs(now - base_ticker.ms) > self.max_miss_ms:
+        #     logging.warn("%s ticker 过期, %s" % (base_exchange.id, now - base_ticker.ms))
+        #     return
 
         diff_price, diff_bid, diff_ask = trade_ticker.price - base_ticker.price, \
                                          trade_ticker.bid - base_ticker.bid, \
@@ -80,7 +80,7 @@ class AbsDiffStrategy(object):
 
 
 @click.command()
-@click.option("--base", default="bitfinex")
+@click.option("--base", default="binance")
 @click.option("--trade", default="okex")
 @click.option("--symbol", default="BTC_USDT")
 @click.option("-d", "--debug", is_flag=True)
@@ -92,7 +92,12 @@ def main(base, trade, symbol, debug):
                             filename="log_abs_strategy.log")
     from util import read_conf
     config = read_conf("./config.json")
-    base_exchange = Binance()
+    if base == 'binance':
+        base_exchange = Binance()
+    elif base == 'bitfinex':
+        base_exchange = Bitfinex()
+    elif base == 'gdax':
+        base_exchange = Gdax()
     trade_exchange = Okex(config['apikey']['okex']['key'], config['apikey']['okex']['secret'])
     AbsDiffStrategy(config, debug).run(base_exchange, trade_exchange, symbol)
 

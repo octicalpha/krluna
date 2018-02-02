@@ -177,11 +177,6 @@ class AbsDiffHandler(tornado.web.RequestHandler):
             'type': 'line',
             'data': [[x.ts, float(x.trade_bid)] for x in data]
         })
-        series.append({
-            'name': 'ask',
-            'type': 'line',
-            'data': [[x.ts, float(x.trade_ask)] for x in data]
-        })
         option['series'] = series
 
         self.render("abs_diff.html", option=json.dumps(option))

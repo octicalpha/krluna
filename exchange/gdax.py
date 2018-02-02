@@ -1,4 +1,5 @@
 # coding: utf8
+import arrow
 import time
 import simplejson as json
 import six
@@ -11,32 +12,28 @@ from model import *
 from base import Exchange
 
 
-class Bitfinex(Exchange):
+class Gdax(Exchange):
     def __init__(self, api_key='', secret=''):
-        super(Bitfinex, self).__init__('bitfinex', api_key, secret, 'https://api.bitfinex.com/v1')
+        super(Gdax, self).__init__('gdax', api_key, secret, 'https://api.gdax.com')
 
     def __trasfer_symbol(self, s):
-        return s.replace('_', '').lower().replace("usdt", "usd")
+        return s.replace('_', '-').lower().replace("usdt", "usd").upper()
 
     def fetch_ticker(self, symbol):
         symbol = self.__trasfer_symbol(symbol)
-        endpoint = "/pubticker/" + symbol
+        endpoint = "/products/%s/ticker" % symbol
         res = self.get(endpoint)
         return self._parse_ticker(res)
 
     def _parse_ticker(self, data):
-        return Ticker(data['bid'], data['ask'], data['last_price'], seconds=data['timestamp'])
-
-    def fetch_depth(self, symbol):
-        symbol = self.__trasfer_symbol(symbol)
-        endpoint = "/book/" + symbol
-        return self.get(endpoint)
+        date = arrow.get(data['time'])
+        return Ticker(data['bid'], data['ask'], data['price'], seconds=date.float_timestamp)
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    api = Bitfinex()
+    api = Gdax()
     a = api.fetch_ticker('eth_usdt')
     print time.time() * 1000 - a.ms
     # print api.fetch_depth('btc_usdt')
