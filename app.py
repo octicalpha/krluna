@@ -128,6 +128,7 @@ class AbsDiffHandler(tornado.web.RequestHandler):
         symbol = self.get_argument('symbol', 'BTC_USDT')
         limit = int(self.get_argument('limit', '2000'))
         table = self.get_argument('table', 'okex_binance')
+        delta = int(self.get_argument('delta', '0'))
 
         table = "abs_diff_" + table
         sql = "select * from (select * from " + table + " where symbol = ? order by id desc limit ?) sub order by id asc"
@@ -162,21 +163,28 @@ class AbsDiffHandler(tornado.web.RequestHandler):
         #     'type': 'line',
         #     'data': [[x.ts, x.trade_ask - x.base_ask] for x in data]
         # })
-        series.append({
-            'name': 'base',
-            'type': 'line',
-            'data': [[x.ts, x.base_price] for x in data],
-        })
-        series.append({
-            'name': 'price',
-            'type': 'line',
-            'data': [[x.ts, float(x.trade_price)] for x in data]
-        })
-        series.append({
-            'name': 'bid',
-            'type': 'line',
-            'data': [[x.ts, float(x.trade_bid)] for x in data]
-        })
+        if delta > 0:
+            series.append({
+                'name': 'diff',
+                'type': 'line',
+                'data': [[x.ts, x.trade_price - x.base_price] for x in data],
+            })
+        else:
+            series.append({
+                'name': 'base',
+                'type': 'line',
+                'data': [[x.ts, x.base_price] for x in data],
+            })
+            series.append({
+                'name': 'price',
+                'type': 'line',
+                'data': [[x.ts, float(x.trade_price)] for x in data]
+            })
+            series.append({
+                'name': 'bid',
+                'type': 'line',
+                'data': [[x.ts, float(x.trade_bid)] for x in data]
+            })
         option['series'] = series
 
         self.render("abs_diff.html", option=json.dumps(option))
