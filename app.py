@@ -21,6 +21,7 @@ class ApiApplication(BaseApplication):
     def __init__(self, debug=False, config=None):
         handlers = [
             ('/', IndexHandler),
+            ('/abs_diff', AbsDiffHandler),
             ('/orders', OrderHandler),
             ('/st', StrategyHandler),
             ('/cancel_order', CancelOrderHandler),
@@ -87,9 +88,11 @@ class IndexHandler(tornado.web.RequestHandler):
         top_ba = top([x[1] for x in ba_seq])
         fee = 0.003
         title = '%s ~ %s GOOD: %s %s %s' % (
-            ms_to_str(data[0][-1]), ms_to_str(data[-1][-1]), top_ab, top_ba, (float(top_ab) - fee)  * (float(top_ba) - fee))
+            ms_to_str(data[0][-1]), ms_to_str(data[-1][-1]), top_ab, top_ba,
+            (float(top_ab) - fee) * (float(top_ba) - fee))
 
         option = {
+            "animation": False,
             "title": {"text": title},
             "xAxis": {
                 "type": 'value',
@@ -118,6 +121,60 @@ class IndexHandler(tornado.web.RequestHandler):
         option['series'] = series
 
         self.render("index.html", option=json.dumps(option))
+
+
+class AbsDiffHandler(tornado.web.RequestHandler):
+    def get(self):
+        symbol = self.get_argument('symbol', 'BTC_USDT')
+        limit = int(self.get_argument('limit', '2000'))
+        table = self.get_argument('table', 'okex_binance')
+
+        table = "abs_diff_" + table
+        sql = "select * from (select * from " + table + " where symbol = ? order by id desc limit ?) sub order by id asc"
+        data = self.application.engine.fetch_row(sql, (symbol, limit))
+
+        option = {
+            "animation": False,
+            "title": {"text": "diff"},
+            "xAxis": {
+                "type": 'value',
+                "min": "dataMin",
+                "max": "dataMax",
+            },
+            "yAxis": {
+                "type": 'value',
+                "min": "dataMin",
+                "max": "dataMax",
+            },
+            "boundaryGap": [0, '100%'],
+            "legend": {
+                "data": ["diff_bid", "diff_ask", "diff_price"],
+            }
+        }
+        series = []
+        # series.append({
+        #     'name': 'diff_bid',
+        #     'type': 'line',
+        #     'data': [[x.ts, x.trade_bid - x.base_bid] for x in data]
+        # })
+        # series.append({
+        #     'name': 'diff_ask',
+        #     'type': 'line',
+        #     'data': [[x.ts, x.trade_ask - x.base_ask] for x in data]
+        # })
+        series.append({
+            'name': 'base_price',
+            'type': 'line',
+            'data': [[x.ts, x.base_price] for x in data]
+        })
+        series.append({
+            'name': 'trade_price',
+            'type': 'line',
+            'data': [[x.ts, float(x.trade_price) - 40] for x in data]
+        })
+        option['series'] = series
+
+        self.render("abs_diff.html", option=json.dumps(option))
 
 
 if __name__ == '__main__':

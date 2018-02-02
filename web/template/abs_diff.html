@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title></title>
+    <script src="/static/echarts.min.js"></script>
+</head>
+<body>
+
+<div id="main" style="width: 100%;height: 600px;"></div>
+<script type="text/javascript">
+    // 基于准备好的dom，初始化echarts实例
+    var myChart = echarts.init(document.getElementById('main'));
+
+    // 指定图表的配置项和数据
+    console.log({{ option }});
+    var option = {{ option }}
+    option['tooltip'] = {
+        trigger: 'axis'
+    }
+    option['legend'] = {
+        data: ['ab', 'ba'],
+        right: '20%'
+    }
+
+    // 使用刚指定的配置项和数据显示图表。
+    myChart.setOption(option);
+</script>
+</body>
+</html>

@@ -25,15 +25,18 @@ class AbsDiffStrategy(object):
 
     def _check_table_exist(self, tablename):
         sql = '''
-            CREATE TABLE if not EXISTS `%s` (
-              `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-              `symbol` varchar(24) NOT NULL DEFAULT '',
-              `bid` decimal(14,4) NOT NULL DEFAULT '0.0000',
-              `ask` decimal(14,4) NOT NULL DEFAULT '0.0000',
-              `price` decimal(14,4) NOT NULL DEFAULT '0.0000',
-              `ts` bigint(20) NOT NULL DEFAULT '0',
-              PRIMARY KEY (`id`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+        CREATE TABLE if not EXISTS `%s` (
+          `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+          `symbol` varchar(24) NOT NULL DEFAULT '',
+          `base_bid` decimal(14,4) NOT NULL DEFAULT '0.0000',
+          `base_ask` decimal(14,4) NOT NULL DEFAULT '0.0000',
+          `base_price` decimal(14,4) NOT NULL DEFAULT '0.0000',
+          `trade_bid` decimal(14,4) NOT NULL DEFAULT '0.0000',
+          `trade_ask` decimal(14,4) NOT NULL DEFAULT '0.0000',
+          `trade_price` decimal(14,4) NOT NULL DEFAULT '0.0000',
+          `ts` bigint(20) NOT NULL DEFAULT '0',
+          PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8
         ''' % tablename
         self.engine.execute(sql)
 
@@ -67,11 +70,13 @@ class AbsDiffStrategy(object):
                                          trade_ticker.ask - base_ticker.ask
         logging.info("diff is : %s\t%s\t%s", diff_price, diff_bid, diff_ask)
         if not self.debug:
-            self.insert_diff_to_table(symbol, diff_bid, diff_ask, diff_price)
+            self.insert_diff_to_table(symbol, trade_ticker, base_ticker)
 
-    def insert_diff_to_table(self, symbol, bid, ask, price):
-        sql = "insert into " + self.diff_tablename + " (symbol, bid, ask, price, ts) values (?, ?, ?, ?, ?)"
-        self.engine.execute(sql, (symbol, bid, ask, price, cur_ms()))
+    def insert_diff_to_table(self, symbol, trade_ticker, base_ticker):
+        sql = "insert into " + self.diff_tablename + \
+              " (symbol, base_bid, base_ask, base_price, trade_bid, trade_ask, trade_price, ts) values (?, ?, ?, ?, ?, ?, ?, ?)"
+        self.engine.execute(sql, (symbol, base_ticker.bid, base_ticker.ask, base_ticker.price,
+                                  trade_ticker.bid, trade_ticker.ask, trade_ticker.price, cur_ms()))
 
 
 @click.command()
