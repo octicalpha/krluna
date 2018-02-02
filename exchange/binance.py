@@ -18,6 +18,10 @@ class Binance(Exchange):
     def __trasfer_symbol(self, s):
         return s.replace('_', '').upper()
 
+    def time(self):
+        endpoint = "/api/v1/time"
+        return self.get(endpoint)
+
     def fetch_ticker(self, symbol):
         symbol = self.__trasfer_symbol(symbol)
         endpoint = "/api/v1/ticker/24hr"
@@ -40,7 +44,10 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
     api = Binance()
+    bs = time.time()
     print api.fetch_ticker('btc_usdt')
+    print time.time() - bs
+    # print time.time() * 1000 - api.time()['serverTime']
     # print api.fetch_depth('btc_usdt')
     # print api.account()
     # print api.order('eth_usdt', 'buy', 'limit', 0.1, 10)
