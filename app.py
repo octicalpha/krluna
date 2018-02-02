@@ -39,12 +39,13 @@ class ApiApplication(BaseApplication):
 class OrderHandler(tornado.web.RequestHandler):
     def get(self):
         status = self.get_argument('status', None)
+        limit = int(self.get_argument('limit', 30))
         if status is None:
-            sql = "select * from `order` order by id desc"
-            data = self.application.engine.fetch_row(sql, ())
+            sql = "select * from `order` order by id desc limit ?"
+            data = self.application.engine.fetch_row(sql, (limit,))
         else:
-            sql = "select * from `order` where status = ? order by id desc"
-            data = self.application.engine.fetch_row(sql, (int(status),))
+            sql = "select * from `order` where status in (?, 99) order by id desc limit ?"
+            data = self.application.engine.fetch_row(sql, (int(status), limit))
         for x in data:
             x['ts'] = ms_to_humanize(x['ts'])
             x['success_ts'] = ms_to_humanize(x['success_ts'])

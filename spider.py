@@ -81,6 +81,9 @@ class TestStrategy(object):
         self.price_chooser = TakerPriceChooser()
         # self.price_chooser = MakerPriceChooser(0.0001)
 
+        self.ts_got_a = 0
+        self.ts_got_b = 0
+
     def refresh_strategy_min_v(self):
         self.min_a, self.min_b = self.balancer.get_threshold()
         if not self.has_init_strategy_threshold:
@@ -117,7 +120,7 @@ class TestStrategy(object):
         self.refresh_strategy_min_v()
         while True:
             self._trade(coin)
-            time.sleep(2)
+            time.sleep(5)
 
     def get_right(self, exchange, coin, li, side='bid', amount=None):
         total = 0
@@ -235,19 +238,23 @@ class TestStrategy(object):
                 return
 
             self.insert_diff_to_table(coin, a, b)
-            if max(a, b) < 1.016 and self.has_unfinish_order():
+            if max(a, b) < 1.01 and self.has_unfinish_order():
                 logging.info("利润太小且有未完成订单")
             else:
                 if a >= self.cur_a:
                     self.miss_a = 0
-                    self.trade_from_left_to_right(coin, symbol, right_buy_price, left_sell_price, a)
+                    if self.ts_got_a > 0 and cur_ms() - self.ts_got_a < 60000:
+                        self.trade_from_left_to_right(coin, symbol, right_buy_price, left_sell_price, a)
+                    self.ts_got_a = cur_ms()
                 else:
                     self.miss_a += 1
                     if self.miss_a > 9:
                         self.cur_a = max(a - 0.0001, self.min_a)
                 if b >= self.cur_b:
                     self.miss_b = 0
-                    self.trade_from_right_to_left(coin, symbol, left_buy_price, right_sell_price, b)
+                    if self.ts_got_b > 0 and cur_ms() - self.ts_got_b < 60000:
+                        self.trade_from_right_to_left(coin, symbol, left_buy_price, right_sell_price, b)
+                    self.ts_got_b = cur_ms()
                 else:
                     self.miss_b += 1
                     if self.miss_b > 9:

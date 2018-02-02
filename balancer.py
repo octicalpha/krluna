@@ -81,10 +81,10 @@ class DefaultTwoSideBalancer(Balancer):
         right_radio = self.right_coin / total
 
         l_to_r, r_to_l = self.get_init_threshold()
-        if left_radio < 0.02:  # 左边太少, 需要 left <- right
+        if left_radio < 0.01:  # 左边太少, 需要 left <- right
             l_to_r += 2
         elif left_radio < 0.1:
-            l_to_r += 0.007
+            l_to_r += 0.0065
         elif left_radio < 0.2:
             l_to_r += 0.004
         elif left_radio < 0.3:
@@ -98,10 +98,10 @@ class DefaultTwoSideBalancer(Balancer):
         elif left_radio < 0.7:
             l_to_r += 0.001
 
-        if right_radio < 0.02:  # 右边太少, 需要 left -> right
+        if right_radio < 0.01:  # 右边太少, 需要 left -> right
             r_to_l += 2
         elif right_radio < 0.1:
-            r_to_l += 0.007
+            r_to_l += 0.0065
         elif right_radio < 0.2:
             r_to_l += 0.004
         elif right_radio < 0.3:
@@ -155,10 +155,10 @@ class BackSeeTwoSideBalancer(DefaultTwoSideBalancer):
         self.diff_table_name = diff_table_name
         self.last_fetch_ts = 0
 
-        self.min_threshold = 1.0035 # 暂时还不支持回撤方式
+        self.min_threshold = 1.0235 # 暂时还不支持回撤方式
 
-        self.last_init_l_to_r = 1.0055
-        self.last_init_r_to_l = 1.0055
+        self.last_init_l_to_r = 1.0285
+        self.last_init_r_to_l = 1.0255
 
         self.coin = coin
 

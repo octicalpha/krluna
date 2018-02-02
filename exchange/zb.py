@@ -108,6 +108,7 @@ class Zb(Exchange):
         params = params_tpl % (self.api_key, currency, id)
         path = 'getOrder'
         obj = self.__api_call(path, params)
+        import pdb; pdb.set_trace()
         return self._parser_order(obj)
 
     def _parser_order(self, data):

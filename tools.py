@@ -39,22 +39,20 @@ class Tool(object):
 
         # sql = "select * from `account` order by id limit 1"
         # baseline  1/28 19:00
-        # base_usdt = 1057.17674094 + 2783.4295696
-        # base_btc = 0.115674402 + 0.096944
         # base_usdt = 2100.72694018 + 1688.17922997
         # base_btc = 0.0214174019997 + 0.202096
 
-        row = json.loads(self.engine.fetchone_row("select * from `account` order by id desc limit 1", ())['value'])
+        if origin:
+            row = json.loads(self.engine.fetchone_row("select * from `account` order by id limit 1", ())['value'])
+        else:
+            row = json.loads(self.engine.fetchone_row("select * from `account` order by id desc limit 1", ())['value'])
         base_usdt, base_btc = 0, 0
         for k, v in row.iteritems():
             acc = Account.parse_from_str(v)
             base_usdt += acc.get_avail("usdt") + acc.get_freeze('usdt')
             base_btc += acc.get_avail("btc") + acc.get_freeze('btc')
 
-        if origin:
-            rate = 11000
-        else:
-            rate = float(self.exchanges['okex'].fetch_ticker('btc_usdt')['ticker']['last'])
+        rate = float(self.exchanges['okex'].fetch_ticker('btc_usdt')['ticker']['last'])
         return total_usdt - base_usdt, total_btc - base_btc, \
                total_btc * rate + total_usdt - base_btc * rate - base_usdt, \
                total_btc * rate + total_usdt, \
@@ -64,6 +62,9 @@ class Tool(object):
 
     def cancel_order(self, exchange, id, symbol):
         print self.exchanges[exchange].cancel_order(symbol, id)
+
+    def order_info(self, exchange, id, symbol):
+        print self.exchanges[exchange].order_info(symbol, id)
 
     def get_unfinish_strategy(self):
         sts = self.strategy_manager.get_unfinished()
@@ -106,6 +107,12 @@ def unfinish():
 def cancel_order(id, symbol, ex):
     tool.cancel_order(ex, id, symbol)
 
+@cli.command()
+@click.option("--id")
+@click.option("--symbol", default="btc_usdt")
+@click.option("--ex")
+def order_info(id, symbol, ex):
+    tool.order_info(ex, id, symbol)
 
 if __name__ == '__main__':
     cli()

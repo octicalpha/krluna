@@ -30,6 +30,9 @@ class OrderScanner(object):
                     if order_info.status == ORDER_STATUS.SUCCESS:
                         logging.info("update order success %s, %s, %s" % (order.exchange, order.id, order.ex_id))
                         self.order_manager.success(order['id'])
+                    elif order_info.status == ORDER_STATUS.CANCELLED:
+                        logging.info("update order cancel %s, %s, %s" % (order.exchange, order.id, order.ex_id))
+                        self.order_manager.update_status(order['id'], ORDER_STATUS.CANCELLED)
 
                 sts = self.strategy_manager.list_by_status(0)
                 for st in sts:
