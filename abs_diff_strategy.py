@@ -23,8 +23,23 @@ class AbsDiffStrategy(object):
 
         self.max_miss_ms = 2000
 
+    def _check_table_exist(self, tablename):
+        sql = '''
+            CREATE TABLE if not EXISTS `%s` (
+              `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+              `symbol` varchar(24) NOT NULL DEFAULT '',
+              `bid` decimal(14,4) NOT NULL DEFAULT '0.0000',
+              `ask` decimal(14,4) NOT NULL DEFAULT '0.0000',
+              `price` decimal(14,4) NOT NULL DEFAULT '0.0000',
+              `ts` bigint(20) NOT NULL DEFAULT '0',
+              PRIMARY KEY (`id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+        ''' % tablename
+        self.engine.execute(sql)
+
     def run(self, base_exchange, trade_exchange, symbol):
         self.diff_tablename = "abs_diff_%s_%s" % (trade_exchange.id, base_exchange.id)
+        self._check_table_exist(self.diff_tablename)
         while True:
             try:
                 self._run(base_exchange, trade_exchange, symbol)

@@ -25,7 +25,6 @@ class Binance(Exchange):
             "symbol": symbol,
         }
         res = self.get(endpoint, data=params)
-        print res
         return self._parse_ticker(res)
 
     def _parse_ticker(self, data):
