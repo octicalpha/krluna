@@ -29,6 +29,17 @@ class Okex(Exchange):
         endpoint = '%s?symbol=%s' % ("/api/v1/depth.do", symbol)
         return self.get(endpoint)
 
+    def fetch_kline(self, symbol, type="3min", size=200):
+        symbol = symbol.lower()
+        endpoint = "/api/v1/kline.do"
+        params = {
+            "symbol": symbol,
+            "type": type,
+            "size": size
+        }
+        data = self.get(endpoint, data=params)
+        return self._kline_to_data_frame(data, freq=type)
+
     def sign(self, params):
         sign = ''
 
@@ -128,9 +139,8 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
     api = Okex()
-    a = api.fetch_ticker('eth_usdt')
-    print a
-    print time.time() - a.seconds
+    # a = api.fetch_ticker('eth_usdt')
+    print api.fetch_kline("btc_usdt")
     # print api.fetch_depth('eth_usdt')
     # print api.account()
     # print api.order('eth_usdt', 'buy', 'limit', 0.1, 10)

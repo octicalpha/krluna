@@ -16,13 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, wait, as_completed
 from exchange.model import *
 
 
-class BtStatus(object):
-    INIT = 0
-    PLACE_BUY_ORDER = 1
-    SUCCESS_BUY_ORDER = 2
-    PLACE_SELL_ORDER = 3
-    SUCCESS_SELL_ORDER = 4
-
+from back_test_util import *
 
 class AbsDiffStrategy(object):
     def __init__(self, config, debug):

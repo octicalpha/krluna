@@ -6,10 +6,17 @@ import requests
 import traceback
 import logging
 import hashlib
+import arrow
 
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+try:
+    import pandas as pd
+    import numpy as np
+except:
+    pd = None
 
 
 class Exchange(object):
@@ -76,3 +83,24 @@ class Exchange(object):
         except Exception, e:
             logging.exception("post data error %s" % url)
             raise e
+
+    def _kline_to_data_frame(self, data, freq=None, idx=[0, 1, 2, 3, 4, 5]):
+        ts_idx, open_idx, high_idx, low_idx, close_idx, vol_idx = idx
+        uniq_data = []
+        exist = set([])
+        for x in data:
+            if x[ts_idx] not in exist:
+                uniq_data.append(x)
+                exist.add(x[ts_idx])
+        data = uniq_data
+        begin = arrow.get(data[0][ts_idx] / 1000).to('local').datetime
+        end = arrow.get(data[-1][ts_idx] / 1000).to('local').datetime
+        dr = pd.date_range(begin, end, freq=freq)
+        dataframe = pd.DataFrame({
+            "open": np.array([float(x[open_idx]) for x in data]),
+            "high": np.array([float(x[high_idx]) for x in data]),
+            "low": np.array([float(x[low_idx]) for x in data]),
+            "close": np.array([float(x[close_idx]) for x in data]),
+            "volume": np.array([float(x[vol_idx]) for x in data])
+        }, index=dr)
+        return dataframe
