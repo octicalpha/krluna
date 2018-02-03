@@ -81,7 +81,7 @@ class TaStrategy(BackTestMixin):
     def back_test(self):
         self.in_backtest = True
         self.bt_min_round_benefit = -60
-        data = self.okex_exchange.fetch_kline(self.symbol, type="1min", size=2000)
+        data = self.okex_exchange.fetch_kline(self.symbol, type="1min", size=1000)
         data['MACD'], data['MACDsignal'], data['MACDhist'] = talib.MACD(data['close'].values)
         # graph(data)
         # return
@@ -108,87 +108,50 @@ class TaStrategy(BackTestMixin):
         # data['EMA30'] = talib.EMA(data['close'].values, timeperiod=30)
         data['MACD'], data['MACDsignal'], data['MACDhist'] = talib.MACD(data['close'].values)
         data['MACDhist'] = data['MACDhist'] * 2
-        one = data.iloc[-3]
-        two = data.iloc[-2]
-        row = data.iloc[-1]
-        if (-21 < row['MACD'] < 30 and one['MACDhist'] < 0 and two['MACDhist'] > 0 and
-                    row['MACDhist'] > two['MACDhist']) or \
-                (-21 < row['MACD'] < 30 and one['MACDhist'] < 0 and two['MACDhist'] < 0 and
-                         row['MACDhist'] > 0 and row['MACDhist'] - two['MACDhist'] > 7):
-            slopes = []
-            logging.info("找到cross, %s" % (data.index[-1]))
-            real_cross = True
-            for j in range(-5, -1):
-                t_row = data.iloc[j]
-                n_row = data.iloc[j + 1]
-                a = n_row['MACDhist'] - t_row['MACDhist']  # 斜率
-                slopes.append(a)
-            if slopes[-1] < 0.4:  # 如果最后一个斜率 < 0.4
-                real_cross = False
-            elif slopes[-1] < slopes[-2] - 0.4 and slopes[-1] < 3.5:
-                # 如果最后一个<倒数第二个, 一般判断不行, 但是为防止误判, 加上最后一个<2, 如果斜率很大的话，暂时认为可以
-                real_cross = False
-            elif slopes[0] > 0:  # 如果第一个斜率为负数, 那么做判断是不是所有的都很小，如果都很小，判断为假穿越
-                all_small = False
-                for x in slopes:
-                    if abs(x) > 2:
-                        all_small = False
-                        break
-                if all_small:
-                    real_cross = False
-            else:
-                if slopes[-1] < 4:
-                    real_cross = False
-            logging.info("slopes is %s, result: %s" % (slopes, real_cross))
-            if not real_cross:
-                return
+        zero = data.iloc[-4]['MACDhist']
+        one = data.iloc[-3]['MACDhist']
+        two = data.iloc[-2]['MACDhist']
+        row = data.iloc[-1]['MACDhist']
+
+        cur_row = data.iloc[-1]
+        if zero * row > 0:  # 没有x
+            return
+        gold_cross, dead_cross = False, False
+        steep = 5.4
+        small = 1.8
+
+        sl1 = one - zero
+        sl2 = two - one
+        sl3 = row - two
+        if row > 0:
+            if sl3 > steep:
+                gold_cross = True
+            elif sl3 > small and sl2 > small and two > 0:
+                gold_cross = True
+            if not (-21 < cur_row['MACD'] < 30):
+                gold_cross = False
+        if row < 0:
+            if sl3 < -steep:
+                dead_cross = True
+            if sl3 < -small and sl2 < -small and two < 0:
+                dead_cross = True
+
+        if gold_cross:
             if self.in_backtest:
-                buy_price = row['high']
+                buy_price = cur_row['high']
                 self.back_test_buy(buy_price, msg=data.index[-1])
             else:
-                role = 'taker' if slopes[-1] > 6 else 'maker'
-                if row['MACD'] > 20 or slopes[-1] < 4.2:
-                    self.buy(self.amount / 2, role)
-                else:
-                    self.buy(self.amount, role)
-        elif (one['MACDhist'] > 0 and two['MACDhist'] < 0 and row['MACDhist'] < two['MACDhist']) or \
-                (one['MACDhist'] > 0 and two['MACDhist'] > 0 and row['MACDhist'] < 0 and row['MACDhist'] - two[
-                    'MACDhist'] < -6):
-            logging.info("找到 down cross, %s" % (data.index[-1]))
-            slopes = []
-            real_cross = True
-            for j in range(-5, -1):
-                t_row = data.iloc[j]
-                n_row = data.iloc[j + 1]
-                a = n_row['MACDhist'] - t_row['MACDhist']  # 斜率
-                slopes.append(a)
-            if slopes[-1] > -0.4:
-                real_cross = False
-            elif slopes[-1] - slopes[-2] > 0.4 and slopes[-1] > -3.5:
-                # 如果最后一个<倒数第二个, 一般判断不行, 但是为防止误判, 加上最后一个<2, 如果斜率很大的话，暂时认为可以
-                real_cross = False
-            elif slopes[0] < 0:  # 如果第一个斜率为负数, 那么做判断是不是所有的都很小，如果都很小，判断为假穿越
-                all_small = False
-                for x in slopes:
-                    if abs(x) > 2:
-                        all_small = False
-                        break
-                if all_small:
-                    real_cross = False
-            else:
-                if slopes[-1] > -4:
-                    real_cross = False
-            logging.info("down cross slopes is %s, result: %s" % (slopes, real_cross))
-            if not real_cross:
-                return
+                role = 'taker' if sl3 > steep else 'maker'
+                self.buy(self.amount, role)
+
+        if dead_cross:
             if self.in_backtest:
-                sell_price = row['low']
+                sell_price = cur_row['low']
                 self.back_test_try_cancel_buy_order()
                 self.back_test_sell(sell_price, msg=data.index[-1])
             else:
                 self.try_cancel_buy_order()
-                slope = row['MACDhist'] - one['MACDhist']
-                role = 'taker' if slope < -6 else 'maker'
+                role = 'taker' if sl3 < -steep else 'maker'
                 self.sell(role)
 
     def try_cancel_buy_order(self):
@@ -254,7 +217,7 @@ class TaStrategy(BackTestMixin):
         amount = self.buy_amount
         if role == 'maker':
             price = self.okex_exchange.fetch_depth(self.symbol)['asks'][-1][0]
-            price = self.buy_price + 10
+            price = max(self.buy_price - 5, price)
         else:
             price = self.okex_exchange.fetch_depth(self.symbol)['bids'][0][0]
         logging.info("try sell, price %s, amount: %s" % (price, amount))
