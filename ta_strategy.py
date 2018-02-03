@@ -43,6 +43,7 @@ class TaStrategy(BackTestMixin):
         self.order_manager = OrderManager(self.engine)
 
         self.buy_price = None
+        self.buy_amount = None
         self.sell_price = None
         self.prod_status = BtStatus.INIT
 
@@ -54,6 +55,7 @@ class TaStrategy(BackTestMixin):
         if od:
             if od['side'] == 'buy':
                 self.buy_price = float(od['price'])
+                self.buy_amount = float(od['amount'])
                 if od['status'] == 1:
                     self.prod_status = BtStatus.PLACE_BUY_ORDER
                 else:
@@ -141,7 +143,8 @@ class TaStrategy(BackTestMixin):
                 buy_price = row['high']
                 self.back_test_buy(buy_price, msg=data.index[-1])
             else:
-                self.buy()
+                if row['MACD'] > 20:
+                    self.buy(self.amount / 2)
         elif one['MACDhist'] > 0 and two['MACDhist'] < 0 and row['MACDhist'] < two['MACDhist']:
             logging.info("find down cross, try sell")
             if self.in_backtest:
@@ -150,7 +153,7 @@ class TaStrategy(BackTestMixin):
             else:
                 self.sell()
 
-    def buy(self):
+    def buy(self, amount):
         if not (self.prod_status == BtStatus.INIT or self.prod_status == BtStatus.SUCCESS_SELL_ORDER):
             return
         price = self.okex_exchange.fetch_depth(self.symbol)['bids'][0][0]
@@ -183,8 +186,9 @@ class TaStrategy(BackTestMixin):
         if not (self.prod_status == BtStatus.INIT or self.prod_status == BtStatus.SUCCESS_BUY_ORDER):
             return
 
+        amount = self.buy_amount
         price = self.okex_exchange.fetch_depth(self.symbol)['asks'][-1][0]
-        logging.info("try sell, price %s, amount: %s" % (price, self.amount))
+        logging.info("try sell, price %s, amount: %s" % (price, amount))
         if not self._check_sell_price_is_ok(price):
             logging.warn("卖价太低了, 等吧, buy: %s, sell: %s" % (self.buy_price, price))
             return
@@ -192,8 +196,8 @@ class TaStrategy(BackTestMixin):
             order_id = cur_ms()
             self.prod_status = BtStatus.SUCCESS_SELL_ORDER
         else:
-            record_id = self.order_manager.init_order(self.okex_exchange.id, self.symbol, 'sell', self.amount, price)
-            order_id = self.okex_exchange.sell_limit(self.symbol, price=price, amount=self.amount)
+            record_id = self.order_manager.init_order(self.okex_exchange.id, self.symbol, 'sell', amount, price)
+            order_id = self.okex_exchange.sell_limit(self.symbol, price=price, amount=amount)
             self.order_manager.update_ex_id(record_id, order_id)
             self.prod_status = BtStatus.PLACE_SELL_ORDER
 
