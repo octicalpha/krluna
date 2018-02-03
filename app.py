@@ -14,7 +14,7 @@ import tornado.web
 
 from skyb.model import MysqlEngine
 from order import *
-from util import ms_to_str, ms_to_humanize, top
+from util import ms_to_str, ms_to_humanize, top, avg
 
 
 class ApiApplication(BaseApplication):
@@ -129,10 +129,16 @@ class AbsDiffHandler(tornado.web.RequestHandler):
         limit = int(self.get_argument('limit', '2000'))
         table = self.get_argument('table', 'okex_binance')
         delta = int(self.get_argument('delta', '0'))
+        begin = int(self.get_argument('begin', '0'))
+        end = int(self.get_argument('end', '0'))
 
         table = "abs_diff_" + table
-        sql = "select * from (select * from " + table + " where symbol = ? order by id desc limit ?) sub order by id asc"
-        data = self.application.engine.fetch_row(sql, (symbol, limit))
+        if begin > 0 and end > 0:
+            sql = "select * from " + table + " where symbol=? and ts between ? and ?"
+            data = self.application.engine.fetch_row(sql, (symbol, begin, end))
+        else:
+            sql = "select * from (select * from " + table + " where symbol = ? order by id desc limit ?) sub order by id asc"
+            data = self.application.engine.fetch_row(sql, (symbol, limit))
 
         option = {
             "animation": False,
@@ -163,27 +169,50 @@ class AbsDiffHandler(tornado.web.RequestHandler):
         #     'type': 'line',
         #     'data': [[x.ts, x.trade_ask - x.base_ask] for x in data]
         # })
+        window = 10
+        base_data = []
+        dt = [float(x.base_price) for x in data]
+        for i in range(len(dt)):
+            if i < window:
+                v = avg(dt[:i+1])
+            else:
+                v = avg(dt[i-window:i+1])
+            if v > 0:
+                base_data.append([data[i].id, v])
+                data[i].base_ma = v
+                
+        t_data = []
+        dt = [float(x.trade_price) for x in data]
+        for i in range(len(dt)):
+            if i < window:
+                v = avg(dt[:i+1])
+            else:
+                v = avg(dt[i-window:i+1])
+            if v > 0:
+                t_data.append([data[i].id, v])
+                data[i].trade_ma = v
         if delta > 0:
             series.append({
                 'name': 'diff',
                 'type': 'line',
-                'data': [[x.ts, x.trade_price - x.base_price] for x in data],
+                'data': [[x.id, x.trade_ma - x.base_ma] for x in data],
             })
         else:
+                
             series.append({
                 'name': 'base',
                 'type': 'line',
-                'data': [[x.ts, x.base_price] for x in data],
+                'data': base_data
             })
             series.append({
                 'name': 'price',
                 'type': 'line',
-                'data': [[x.ts, float(x.trade_price)] for x in data]
+                'data': t_data
             })
             series.append({
                 'name': 'bid',
                 'type': 'line',
-                'data': [[x.ts, float(x.trade_bid)] for x in data]
+                'data': [[x.id, float(x.trade_bid)] for x in data]
             })
         option['series'] = series
 

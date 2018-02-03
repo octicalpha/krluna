@@ -20,6 +20,8 @@ def cur_ms():
 
 
 def avg(li):
+    if len(li) == 0:
+        return 0
     return sum(li) / len(li)
 
 
