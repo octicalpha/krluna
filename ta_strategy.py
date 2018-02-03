@@ -155,12 +155,15 @@ class TaStrategy(BackTestMixin):
             return
         price = self.okex_exchange.fetch_depth(self.symbol)['bids'][0][0]
         logging.info("try buy, price %s, amount: %s" % (price, self.amount))
-        order_id = None
-        if not self.debug:
+        if self.debug:
+            order_id = cur_ms()
+            self.prod_status = BtStatus.SUCCESS_BUY_ORDER
+        else:
             buy_record_id = self.order_manager.init_order(self.okex_exchange.id, self.symbol, 'buy', self.amount, price)
             order_id = self.okex_exchange.buy_limit(self.symbol, price=price, amount=self.amount)
             self.order_manager.update_ex_id(buy_record_id, order_id)
             self.buy_price = price
+            self.prod_status = BtStatus.PLACE_BUY_ORDER
         logging.info("发送买单成功 buy_order_id: %s" % order_id)
         slack("buy price %s" % price)
 
@@ -185,11 +188,14 @@ class TaStrategy(BackTestMixin):
         if not self._check_sell_price_is_ok(price):
             logging.warn("卖价太低了, 等吧, buy: %s, sell: %s" % (self.buy_price, price))
             return
-        order_id = None
-        if not self.debug:
+        if self.debug:
+            order_id = cur_ms()
+            self.prod_status = BtStatus.SUCCESS_SELL_ORDER
+        else:
             record_id = self.order_manager.init_order(self.okex_exchange.id, self.symbol, 'sell', self.amount, price)
             order_id = self.okex_exchange.sell_limit(self.symbol, price=price, amount=self.amount)
             self.order_manager.update_ex_id(record_id, order_id)
+            self.prod_status = BtStatus.PLACE_SELL_ORDER
 
         logging.info("发送卖单成功 sell_order_id: %s" % order_id)
         slack("sell price %s" % price)
