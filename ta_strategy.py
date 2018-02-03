@@ -93,7 +93,7 @@ class TaStrategy(BackTestMixin):
         for i in range(200, l):
             self.record = data.iloc[0: i + 1, :]
             self._run()
-        print self.bt_benefit
+        print self.bt_benefit - self.bt_tx_cnt * 10
 
     def has_unfinish_order(self):
         a = len(self.order_manager.list_by_status(ORDER_STATUS.PLACED)) >= 1
@@ -255,8 +255,7 @@ def graph(data):
 @click.option("--back", is_flag=True)
 def main(debug, back):
     if debug or back:
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
-                            filename="log_ta_strategy.log")
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     else:
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
                             filename="log_ta_strategy.log")

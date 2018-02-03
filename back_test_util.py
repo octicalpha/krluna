@@ -22,8 +22,15 @@ class BackTestMixin(object):
         self.bt_min_round_benefit = -10
         # --------- backtest vars --------------
 
-    def get_bt_min_round_benefit(self):
-        return self.bt_min_round_benefit
+    def _back_test_check_sell_price_is_ok(self, price):
+        delta = price - self.bt_buy_price
+        if self.bt_buy_price > 8900:
+            return delta > -60
+        if self.bt_buy_price > 8500:
+            return delta > -15
+        if self.bt_buy_price < 8200:
+            return delta > 40
+        return delta > 0
 
     def back_test_buy(self, price, amount=1, msg=""):
         if not (self.bt_status == BtStatus.INIT or self.bt_status == BtStatus.SUCCESS_SELL_ORDER):
@@ -38,7 +45,7 @@ class BackTestMixin(object):
         if not (self.bt_status == BtStatus.INIT or self.bt_status == BtStatus.SUCCESS_BUY_ORDER):
             return
         self.bt_sell_price = price
-        if self.bt_sell_price - self.bt_buy_price < self.get_bt_min_round_benefit():
+        if not self._back_test_check_sell_price_is_ok(price):
             return
         self.bt_status = BtStatus.PLACE_SELL_ORDER
         logging.info("sell with price %s, msg: %s" % (self.bt_sell_price, msg))
