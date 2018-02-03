@@ -25,10 +25,6 @@ except:
 from back_test_util import *
 
 
-def slope(a, b):
-    return b - a
-
-
 class TaStrategy(BackTestMixin):
     def __init__(self, config, symbol, backtest=False, debug=True):
         key_config = config['apikey']
@@ -160,7 +156,9 @@ class TaStrategy(BackTestMixin):
                 self.back_test_sell(sell_price, msg=data.index[-1])
             else:
                 self.try_cancel_buy_order()
-                self.sell()
+                slope = row['MACDhist'] - one['MACDhist']
+                role = 'taker' if slope < -6 else 'maker'
+                self.sell(role)
 
     def try_cancel_buy_order(self):
         if self.prod_status != BtStatus.PLACE_BUY_ORDER: #有未成交买单是处理
@@ -197,7 +195,6 @@ class TaStrategy(BackTestMixin):
         logging.info("发送买单成功 buy_order_id: %s" % order_id)
         slack("buy price %s" % price)
 
-
     def check_price_level(self, price):
         if price > 8900:
             return 'high'
@@ -215,7 +212,7 @@ class TaStrategy(BackTestMixin):
             return delta > 40
         return delta > 0
 
-    def sell(self):
+    def sell(self, role):
         if self.bt_force_buy_first and self.prod_status == BtStatus.INIT:
             logging.info("没有买单, 不能卖")
             return
@@ -224,8 +221,10 @@ class TaStrategy(BackTestMixin):
             return
 
         amount = self.buy_amount
-        #price = self.okex_exchange.fetch_depth(self.symbol)['asks'][-1][0]
-        price = self.okex_exchange.fetch_depth(self.symbol)['bids'][0][0]
+        if role == 'maker':
+            price = self.okex_exchange.fetch_depth(self.symbol)['asks'][-1][0]
+        else:
+            price = self.okex_exchange.fetch_depth(self.symbol)['bids'][0][0]
         logging.info("try sell, price %s, amount: %s" % (price, amount))
         if not self._check_sell_price_is_ok(price):
             logging.warn("卖价太低了, 等吧, buy: %s, sell: %s" % (self.buy_price, price))
