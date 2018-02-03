@@ -223,6 +223,7 @@ class TaStrategy(BackTestMixin):
         amount = self.buy_amount
         if role == 'maker':
             price = self.okex_exchange.fetch_depth(self.symbol)['asks'][-1][0]
+            price = self.buy_price + 10
         else:
             price = self.okex_exchange.fetch_depth(self.symbol)['bids'][0][0]
         logging.info("try sell, price %s, amount: %s" % (price, amount))
