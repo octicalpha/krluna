@@ -163,13 +163,15 @@ class TaStrategy(BackTestMixin):
                 self.sell()
 
     def try_cancel_buy_order(self):
+        if self.prod_status != BtStatus.PLACE_BUY_ORDER: #有未成交买单是处理
+            return
         sql = "select * from `order` where status in (1, 100) order by id desc limit 1"
         od = self.engine.fetchone_row(sql, ())
         if not od:
             return
         if od['side'] != 'buy':
             return
-        if self.okex_exchange.order_info(od['ex_id'])['status'] == ORDER_STATUS.PLACED:
+        if self.okex_exchange.order_info(od['symbol'], od['ex_id'])['status'] == ORDER_STATUS.PLACED:
             self.okex_exchange.cancel_order(od['symbol'], od['ex_id'])
             self.order_manager.update_status(od['id'], ORDER_STATUS.CANCELLED)
             self.prod_status = BtStatus.INIT
