@@ -53,7 +53,6 @@ class TaStrategy(BackTestMixin):
     def recover_from_db(self):
         sql = "select * from `order` where status in (1, 100) order by id desc limit 1"
         od = self.engine.fetchone_row(sql, ())
-        logging.info("从数据库恢复 %s" % od)
         if od:
             if od['side'] == 'buy':
                 self.buy_price = float(od['price'])
@@ -76,13 +75,12 @@ class TaStrategy(BackTestMixin):
                     time.sleep(2)
                     continue
                 self.recover_from_db()
-                if arrow.now().to('local').second < 30:
-                    continue
-                self.record = self.okex_exchange.fetch_kline(self.symbol, type="1min", size=500)
-                self._run()
+                if arrow.now().to('local').second > 18:
+                    self.record = self.okex_exchange.fetch_kline(self.symbol, type="1min", size=500)
+                    self._run()
             except:
                 logging.exception("")
-            time.sleep(10)
+            time.sleep(8)
 
     def back_test(self):
         self.in_backtest = True
@@ -150,23 +148,40 @@ class TaStrategy(BackTestMixin):
                 buy_price = row['high']
                 self.back_test_buy(buy_price, msg=data.index[-1])
             else:
+                role = 'taker' if slopes[-1] > 6 else 'maker'
                 if row['MACD'] > 20 or slopes[-1] < 4.2:
-                    self.buy(self.amount / 2)
+                    self.buy(self.amount / 2, role)
                 else:
-                    self.buy(self.amount)
+                    self.buy(self.amount, role)
         elif one['MACDhist'] > 0 and two['MACDhist'] < 0 and row['MACDhist'] < two['MACDhist']:
             logging.info("find down cross, try sell")
             if self.in_backtest:
                 sell_price = row['low']
                 self.back_test_sell(sell_price, msg=data.index[-1])
             else:
+                self.try_cancel_buy_order()
                 self.sell()
 
-    def buy(self, amount):
-        if not (self.prod_status == BtStatus.INIT or self.prod_status == BtStatus.SUCCESS_SELL_ORDER):
-            logging.info("不是初始状态或者买单未完成, 不能买")
+    def try_cancel_buy_order(self):
+        sql = "select * from `order` where status in (1, 100) order by id desc limit 1"
+        od = self.engine.fetchone_row(sql, ())
+        if not od:
             return
-        price = self.okex_exchange.fetch_depth(self.symbol)['bids'][0][0]
+        if od['side'] != 'buy':
+            return
+        if self.okex_exchange.order_info(od['ex_id'])['status'] == ORDER_STATUS.PLACED:
+            self.okex_exchange.cancel_order(od['symbol'], od['ex_id'])
+            self.order_manager.update_status(od['id'], ORDER_STATUS.CANCELLED)
+            self.prod_status = BtStatus.INIT
+
+    def buy(self, amount, role):
+        if not (self.prod_status == BtStatus.INIT or self.prod_status == BtStatus.SUCCESS_SELL_ORDER):
+            logging.info("不是初始状态或者卖单未完成, 不能买")
+            return
+        if role == 'maker':
+            price = self.okex_exchange.fetch_depth(self.symbol)['bids'][0][0]
+        else:
+            price = self.okex_exchange.fetch_depth(self.symbol)['asks'][-1][0]
         logging.info("try buy, price %s, amount: %s" % (price, self.amount))
         if self.debug:
             order_id = cur_ms()
@@ -207,7 +222,8 @@ class TaStrategy(BackTestMixin):
             return
 
         amount = self.buy_amount
-        price = self.okex_exchange.fetch_depth(self.symbol)['asks'][-1][0]
+        #price = self.okex_exchange.fetch_depth(self.symbol)['asks'][-1][0]
+        price = self.okex_exchange.fetch_depth(self.symbol)['bids'][0][0]
         logging.info("try sell, price %s, amount: %s" % (price, amount))
         if not self._check_sell_price_is_ok(price):
             logging.warn("卖价太低了, 等吧, buy: %s, sell: %s" % (self.buy_price, price))
