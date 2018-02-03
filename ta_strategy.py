@@ -110,8 +110,11 @@ class TaStrategy(BackTestMixin):
         one = data.iloc[-3]
         two = data.iloc[-2]
         row = data.iloc[-1]
-        if -21 < row['MACD'] < 30 and one['MACDhist'] < 0 and two['MACDhist'] > 0 and row['MACDhist'] > two[
-            'MACDhist']:
+        if (-21 < row['MACD'] < 30 and one['MACDhist'] < 0 and two['MACDhist'] > 0 and
+                    row['MACDhist'] > two['MACDhist']) or \
+                (-21 < row['MACD'] < 30 and one['MACDhist'] < 0 and two['MACDhist'] < 0 and
+                         row['MACDhist'] > 0 and row['MACDhist'] - two['MACDhist'] > 7):
+
             slopes = []
             logging.info("找到cross, %s" % (data.index[-1]))
             slack("find cross")
@@ -153,6 +156,7 @@ class TaStrategy(BackTestMixin):
             logging.info("find down cross, try sell")
             if self.in_backtest:
                 sell_price = row['low']
+                self.back_test_try_cancel_buy_order()
                 self.back_test_sell(sell_price, msg=data.index[-1])
             else:
                 self.try_cancel_buy_order()
@@ -161,7 +165,7 @@ class TaStrategy(BackTestMixin):
                 self.sell(role)
 
     def try_cancel_buy_order(self):
-        if self.prod_status != BtStatus.PLACE_BUY_ORDER: #有未成交买单是处理
+        if self.prod_status != BtStatus.PLACE_BUY_ORDER:  # 有未成交买单是处理
             return
         sql = "select * from `order` where status in (1, 100) order by id desc limit 1"
         od = self.engine.fetchone_row(sql, ())
