@@ -120,13 +120,13 @@ class TaStrategy(BackTestMixin):
             for j in range(-5, -1):
                 t_row = data.iloc[j]
                 n_row = data.iloc[j + 1]
-                a = n_row['MACDhist'] - t_row['MACDhist']
+                a = n_row['MACDhist'] - t_row['MACDhist'] # 斜率
                 slopes.append(a)
-            if slopes[-1] < 0.2:
+            if slopes[-1] < 0.2: # 如果最后一个斜率 < 0.2
                 real_cross = False
-            elif slopes[-1] < slopes[-2] - 0.1 and slopes[-1] < 2:
+            elif slopes[-1] < slopes[-2] - 0.1 and slopes[-1] < 2: # 如果最后一个<倒数第二个, 一般判断不行, 但是为防止误判, 加上最后一个<2, 如果斜率很大的话，暂时认为可以
                 real_cross = False
-            elif slopes[0] > 0:
+            elif slopes[0] > 0: # 如果第一个斜率为负数, 那么做判断是不是所有的都很小，如果都很小，判断为假穿越
                 all_small = False
                 for x in slopes:
                     if abs(x) > 1.2:
@@ -135,8 +135,9 @@ class TaStrategy(BackTestMixin):
                 if all_small:
                     real_cross = False
             else:
-                if slopes[-1] < 3:
+                if slopes[-1] < 2.5:
                     real_cross = False
+            logging.info("slopes is %s, result: %s" % (slopes, real_cross))
             if not real_cross:
                 return
             if self.in_backtest:
