@@ -53,6 +53,7 @@ class TaStrategy(BackTestMixin):
     def recover_from_db(self):
         sql = "select * from `order` where status in (1, 100) order by id desc limit 1"
         od = self.engine.fetchone_row(sql, ())
+        logging.info("从数据库恢复 %s" % od)
         if od:
             if od['side'] == 'buy':
                 self.buy_price = float(od['price'])
@@ -75,6 +76,8 @@ class TaStrategy(BackTestMixin):
                     time.sleep(2)
                     continue
                 self.recover_from_db()
+                if arrow.now().to('local').second < 30:
+                    continue
                 self.record = self.okex_exchange.fetch_kline(self.symbol, type="1min", size=500)
                 self._run()
             except:
@@ -126,19 +129,19 @@ class TaStrategy(BackTestMixin):
                 slopes.append(a)
             if slopes[-1] < 0.4:  # 如果最后一个斜率 < 0.4
                 real_cross = False
-            elif slopes[-1] < slopes[-2] - 0.2 and slopes[-1] < 3.5:
+            elif slopes[-1] < slopes[-2] - 0.4 and slopes[-1] < 3.5:
                 # 如果最后一个<倒数第二个, 一般判断不行, 但是为防止误判, 加上最后一个<2, 如果斜率很大的话，暂时认为可以
                 real_cross = False
             elif slopes[0] > 0:  # 如果第一个斜率为负数, 那么做判断是不是所有的都很小，如果都很小，判断为假穿越
                 all_small = False
                 for x in slopes:
-                    if abs(x) > 1.5:
+                    if abs(x) > 2:
                         all_small = False
                         break
                 if all_small:
                     real_cross = False
             else:
-                if slopes[-1] < 3:
+                if slopes[-1] < 4:
                     real_cross = False
             logging.info("slopes is %s, result: %s" % (slopes, real_cross))
             if not real_cross:
@@ -147,8 +150,10 @@ class TaStrategy(BackTestMixin):
                 buy_price = row['high']
                 self.back_test_buy(buy_price, msg=data.index[-1])
             else:
-                if row['MACD'] > 20:
+                if row['MACD'] > 20 or slopes[-1] < 4.2:
                     self.buy(self.amount / 2)
+                else:
+                    self.buy(self.amount)
         elif one['MACDhist'] > 0 and two['MACDhist'] < 0 and row['MACDhist'] < two['MACDhist']:
             logging.info("find down cross, try sell")
             if self.in_backtest:
