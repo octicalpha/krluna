@@ -159,6 +159,7 @@ class TaStrategy(BackTestMixin):
 
     def buy(self, amount):
         if not (self.prod_status == BtStatus.INIT or self.prod_status == BtStatus.SUCCESS_SELL_ORDER):
+            logging.info("不是初始状态或者买单未完成, 不能买")
             return
         price = self.okex_exchange.fetch_depth(self.symbol)['bids'][0][0]
         logging.info("try buy, price %s, amount: %s" % (price, self.amount))
@@ -194,8 +195,10 @@ class TaStrategy(BackTestMixin):
 
     def sell(self):
         if self.bt_force_buy_first and self.prod_status == BtStatus.INIT:
+            logging.info("没有买单, 不能卖")
             return
         if not (self.prod_status == BtStatus.INIT or self.prod_status == BtStatus.SUCCESS_BUY_ORDER):
+            logging.info("没有买单, 不能卖")
             return
 
         amount = self.buy_amount
