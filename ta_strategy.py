@@ -16,7 +16,10 @@ from concurrent.futures import ThreadPoolExecutor, wait, as_completed
 from exchange.model import *
 import talib
 import pandas as pd
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+except:
+    plt = None
 
 from back_test_util import *
 
@@ -103,7 +106,6 @@ class TaStrategy(BackTestMixin):
         # data['RSI6'] = talib.RSI(data['close'].values, timeperiod=6)
         # data['RSI20'] = talib.RSI(data['close'].values, timeperiod=20)
         data['MACD'], data['MACDsignal'], data['MACDhist'] = talib.MACD(data['close'].values)
-        print data
         one = data.iloc[-3]
         two = data.iloc[-2]
         row = data.iloc[-1]
@@ -111,6 +113,7 @@ class TaStrategy(BackTestMixin):
             'MACDhist']:
             slopes = []
             logging.info("找到cross, %s" % (data.index[-1]))
+            slack("find cross")
             real_cross = True
             for j in range(-5, -1):
                 t_row = data.iloc[j]
@@ -140,6 +143,7 @@ class TaStrategy(BackTestMixin):
             else:
                 self.buy()
         elif one['MACDhist'] > 0 and two['MACDhist'] < 0 and row['MACDhist'] < two['MACDhist']:
+            logging.info("find down cross, try sell")
             if self.in_backtest:
                 sell_price = row['low']
                 self.back_test_sell(sell_price, msg=data.index[-1])
@@ -158,6 +162,7 @@ class TaStrategy(BackTestMixin):
             self.order_manager.update_ex_id(buy_record_id, order_id)
             self.buy_price = price
         logging.info("发送买单成功 buy_order_id: %s" % order_id)
+        slack("buy price %s" % price)
 
     def _check_sell_price_is_ok(self, price):
         delta = price - self.buy_price
@@ -187,6 +192,7 @@ class TaStrategy(BackTestMixin):
             self.order_manager.update_ex_id(record_id, order_id)
 
         logging.info("发送卖单成功 sell_order_id: %s" % order_id)
+        slack("sell price %s" % price)
 
 
 def graph(data):
@@ -203,7 +209,8 @@ def graph(data):
 @click.option("--back", is_flag=True)
 def main(debug, back):
     if debug or back:
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
+                            filename="log_ta_strategy.log")
     else:
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
                             filename="log_ta_strategy.log")
