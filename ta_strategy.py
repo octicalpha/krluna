@@ -105,6 +105,7 @@ class TaStrategy(BackTestMixin):
 
         # data['RSI6'] = talib.RSI(data['close'].values, timeperiod=6)
         # data['RSI20'] = talib.RSI(data['close'].values, timeperiod=20)
+        # data['EMA30'] = talib.EMA(data['close'].values, timeperiod=30)
         data['MACD'], data['MACDsignal'], data['MACDhist'] = talib.MACD(data['close'].values)
         data['MACDhist'] = data['MACDhist'] * 2
         one = data.iloc[-3]
@@ -114,10 +115,8 @@ class TaStrategy(BackTestMixin):
                     row['MACDhist'] > two['MACDhist']) or \
                 (-21 < row['MACD'] < 30 and one['MACDhist'] < 0 and two['MACDhist'] < 0 and
                          row['MACDhist'] > 0 and row['MACDhist'] - two['MACDhist'] > 7):
-
             slopes = []
             logging.info("找到cross, %s" % (data.index[-1]))
-            slack("find cross")
             real_cross = True
             for j in range(-5, -1):
                 t_row = data.iloc[j]
@@ -152,8 +151,36 @@ class TaStrategy(BackTestMixin):
                     self.buy(self.amount / 2, role)
                 else:
                     self.buy(self.amount, role)
-        elif one['MACDhist'] > 0 and two['MACDhist'] < 0 and row['MACDhist'] < two['MACDhist']:
-            logging.info("find down cross, try sell")
+        elif (one['MACDhist'] > 0 and two['MACDhist'] < 0 and row['MACDhist'] < two['MACDhist']) or \
+                (one['MACDhist'] > 0 and two['MACDhist'] > 0 and row['MACDhist'] < 0 and row['MACDhist'] - two[
+                    'MACDhist'] < -6):
+            logging.info("找到 down cross, %s" % (data.index[-1]))
+            slopes = []
+            real_cross = True
+            for j in range(-5, -1):
+                t_row = data.iloc[j]
+                n_row = data.iloc[j + 1]
+                a = n_row['MACDhist'] - t_row['MACDhist']  # 斜率
+                slopes.append(a)
+            if slopes[-1] > -0.4:
+                real_cross = False
+            elif slopes[-1] - slopes[-2] > 0.4 and slopes[-1] > -3.5:
+                # 如果最后一个<倒数第二个, 一般判断不行, 但是为防止误判, 加上最后一个<2, 如果斜率很大的话，暂时认为可以
+                real_cross = False
+            elif slopes[0] < 0:  # 如果第一个斜率为负数, 那么做判断是不是所有的都很小，如果都很小，判断为假穿越
+                all_small = False
+                for x in slopes:
+                    if abs(x) > 2:
+                        all_small = False
+                        break
+                if all_small:
+                    real_cross = False
+            else:
+                if slopes[-1] > -4:
+                    real_cross = False
+            logging.info("down cross slopes is %s, result: %s" % (slopes, real_cross))
+            if not real_cross:
+                return
             if self.in_backtest:
                 sell_price = row['low']
                 self.back_test_try_cancel_buy_order()
