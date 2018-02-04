@@ -53,6 +53,7 @@ class BackTestMixin(object):
     def back_test_try_cancel_buy_order(self):
         if self.bt_status != BtStatus.PLACE_BUY_ORDER:  # 有未成交买单是处理
             return
+        logging.info("cancel buy order")
         self.bt_status = BtStatus.INIT
 
     def back_test_check_tx_success(self, high_price, low_price):

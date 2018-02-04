@@ -43,6 +43,7 @@ class TaStrategy(BackTestMixin):
         self.buy_amount = None
         self.sell_price = None
         self.prod_status = BtStatus.INIT
+        self.cmp_buy_price_cnt = [0, 0]
 
         BackTestMixin.__init__(self)
 
@@ -76,17 +77,16 @@ class TaStrategy(BackTestMixin):
                     self._run()
             except:
                 logging.exception("")
-            time.sleep(8)
+            time.sleep(10)
 
     def back_test(self):
         self.in_backtest = True
         self.bt_min_round_benefit = -60
         data = self.okex_exchange.fetch_kline(self.symbol, type="1min", size=1000)
-        data['MACD'], data['MACDsignal'], data['MACDhist'] = talib.MACD(data['close'].values)
         # graph(data)
         # return
         l = len(data)
-        for i in range(200, l):
+        for i in range(400, l):
             self.record = data.iloc[0: i + 1, :]
             self._run()
         print self.bt_benefit - self.bt_tx_cnt * 10
@@ -102,11 +102,36 @@ class TaStrategy(BackTestMixin):
         data = self.record
         if self.in_backtest:
             self.back_test_check_tx_success(data.iloc[-1]['high'], data.iloc[-1]['low'])
+        # if self.bt_status == BtStatus.SUCCESS_BUY_ORDER:
+        #         if float(data.iloc[-1]['high']) < (self.bt_buy_price + 20):
+        #             self.cmp_buy_price_cnt[0] += 6
+        #         else:
+        #             self.cmp_buy_price_cnt[1] += 6
+        #         if self.cmp_buy_price_cnt[0] - self.cmp_buy_price_cnt[1] > 30:
+        #             logging.info("长时间不涨, 设定价格卖出")
+        #             self.back_test_sell(price=self.bt_buy_price+20)
+        #         if abs(self.bt_buy_price - 9381.4795) < 0.001:
+        #             logging.info(self.cmp_buy_price_cnt)
+        #     else:
+        #         self.cmp_buy_price_cnt = [0, 0]
+        # else:
+        #     if self.prod_status == BtStatus.SUCCESS_BUY_ORDER:
+        #         if float(data.iloc[-1]['high']) < (self.buy_price + 20):
+        #             self.cmp_buy_price_cnt[0] += 1
+        #         else:
+        #             self.cmp_buy_price_cnt[1] += 1
+        #         if self.cmp_buy_price_cnt[0] - self.cmp_buy_price_cnt[1] > 24:
+        #             logging.info("长时间不涨, 设定价格卖出")
+        #             self.sell(price=self.buy_price + 40, role='maker')
+        #     else:
+        #         self.cmp_buy_price_cnt = [0, 0]
 
         # data['RSI6'] = talib.RSI(data['close'].values, timeperiod=6)
         # data['RSI20'] = talib.RSI(data['close'].values, timeperiod=20)
         # data['EMA30'] = talib.EMA(data['close'].values, timeperiod=30)
-        data['MACD'], data['MACDsignal'], data['MACDhist'] = talib.MACD(data['close'].values)
+        # data['MACD'], data['MACDsignal'], data['MACDhist'] = talib.MACD(data['close'].values)
+        data['MACD'], data['MACDsignal'], data['MACDhist'] = talib.MACD(data['close'].values,
+                                                                        fastperiod=5, slowperiod=34, signalperiod=5)
         data['MACDhist'] = data['MACDhist'] * 2
         zero = data.iloc[-4]['MACDhist']
         one = data.iloc[-3]['MACDhist']
@@ -124,27 +149,40 @@ class TaStrategy(BackTestMixin):
         sl2 = two - one
         sl3 = row - two
         if row > 0:
+            if cur_row['MACD'] < -5:
+                steep = 17
+                small = 7
+            else:
+                steep = 11
+                small = 5
             if sl3 > steep:
                 gold_cross = True
             elif sl3 > small and sl2 > small and two > 0:
                 gold_cross = True
-            if not (-21 < cur_row['MACD'] < 30):
-                gold_cross = False
         if row < 0:
+            if cur_row['MACD'] > 5:
+                steep = 17
+                small = 7
+            else:
+                steep = 11
+                small = 5
             if sl3 < -steep:
                 dead_cross = True
             if sl3 < -small and sl2 < -small and two < 0:
                 dead_cross = True
 
+        msg = (zero, one, two, row, sl1, sl2, sl3)
         if gold_cross:
+            logging.info("find gold cross, %s, %s", data.index[-1], msg)
             if self.in_backtest:
-                buy_price = cur_row['high']
+                buy_price = cur_row['high'] + 10
                 self.back_test_buy(buy_price, msg=data.index[-1])
             else:
                 role = 'taker' if sl3 > steep else 'maker'
                 self.buy(self.amount, role)
 
         if dead_cross:
+            logging.info("find dead cross, %s, %s", data.index[-1], msg)
             if self.in_backtest:
                 sell_price = cur_row['low']
                 self.back_test_try_cancel_buy_order()
@@ -152,7 +190,7 @@ class TaStrategy(BackTestMixin):
             else:
                 self.try_cancel_buy_order()
                 role = 'taker' if sl3 < -steep else 'maker'
-                self.sell(role)
+                self.sell(role=role)
 
     def try_cancel_buy_order(self):
         if self.prod_status != BtStatus.PLACE_BUY_ORDER:  # 有未成交买单是处理
@@ -206,7 +244,7 @@ class TaStrategy(BackTestMixin):
             return delta > 40
         return delta > 0
 
-    def sell(self, role):
+    def sell(self, price=None, role=None):
         if self.bt_force_buy_first and self.prod_status == BtStatus.INIT:
             logging.info("没有买单, 不能卖")
             return
@@ -215,11 +253,11 @@ class TaStrategy(BackTestMixin):
             return
 
         amount = self.buy_amount
-        if role == 'maker':
-            price = self.okex_exchange.fetch_depth(self.symbol)['asks'][-1][0]
-            price = max(self.buy_price - 5, price)
-        else:
-            price = self.okex_exchange.fetch_depth(self.symbol)['bids'][0][0]
+        if not price:
+            if role == 'maker':
+                price = self.okex_exchange.fetch_depth(self.symbol)['asks'][-1][0]
+            else:
+                price = self.okex_exchange.fetch_depth(self.symbol)['bids'][0][0]
         logging.info("try sell, price %s, amount: %s" % (price, amount))
         if not self._check_sell_price_is_ok(price):
             logging.warn("卖价太低了, 等吧, buy: %s, sell: %s" % (self.buy_price, price))
