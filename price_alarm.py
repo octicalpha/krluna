@@ -27,6 +27,23 @@ class PriceAlarm(object):
 
         self.success_alarm = False
 
+        self.init_db()
+
+    def init_db(self):
+        sql = """
+        CREATE TABLE if not EXISTS `price_monitor_symbols` (
+          `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+          `exchange` varchar(24) NOT NULL DEFAULT '',
+          `symbol` varchar(24) NOT NULL DEFAULT '',
+          `low` decimal(18,8) DEFAULT NULL,
+          `high` decimal(18,8) DEFAULT NULL,
+          `status` int(11) NOT NULL DEFAULT '1',
+          `ts` bigint(20) DEFAULT NULL,
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `ukey__exchange_symbol` (`exchange`,`symbol`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+        """
+
     def refresh_db_config(self):
         sql = "select * from price_monitor_symbols where status = 1"
         self.symbols = self.engine.fetch_row(sql, ())
