@@ -13,6 +13,7 @@ from util import slack, cur_ms, avg, fix_float_radix, run_cmd
 from concurrent.futures import ThreadPoolExecutor
 from threading import Thread
 
+
 def run_thread(fn, args=()):
     t = Thread(target=fn, args=args)
     t.daemon = True
@@ -24,17 +25,15 @@ class PriceAlarm(object):
         self.debug = debug
         self.exchange = Okex(config['apikey']['okex']['key'], config['apikey']['okex']['secret'])
         self.engine = MysqlEngine(config['db']['url'])
-        self.symbols = None
         self.init_db()
 
-        self.refresh_db_config()
+        self.symbols = self.refresh_db_config()
 
         self.pool = ThreadPoolExecutor(4)
         run_thread(self.sched_refresh_db_config)
         run_thread(self.reset_success_alarm)
 
         self.success_alarm = False
-
 
     def init_db(self):
         sql = """
@@ -54,16 +53,37 @@ class PriceAlarm(object):
 
     def refresh_db_config(self):
         sql = "select * from price_monitor_symbols where status = 1"
-        self.symbols = self.engine.fetch_row(sql, ())
+        return self.engine.fetch_row(sql, ())
+
+    def is_symbols_diff(self, a, b):
+        if len(a) != len(b):
+            return True
+        a_map = {}
+        for x in a:
+            a_map[x.exchange + x.symbol] = [float(x.low), float(x.high)]
+        for x in b:
+            key = x.exchange + x.symbol
+            if key not in a_map:
+                return True
+            a_v = a_map[key]
+            if float(x.low) - a_v[0] > 1:
+                return True
+            if float(x.high) - a_v[1] > 1:
+                return True
+        return False
 
     def sched_refresh_db_config(self):
         while True:
             try:
-                self.refresh_db_config()
-                logging.info("refresh %s" % self.symbols)
+                new_data = self.refresh_db_config()
+                logging.info("refresh %s" % new_data)
+                if self.is_symbols_diff(self.symbols, new_data):
+                    self.success_alarm = False
+                    logging.info("succ")
+                self.symbols = new_data
             except:
-                logging.error("refresh error")
-            time.sleep(60)
+                logging.exception("refresh error")
+            time.sleep(2)
 
     def reset_success_alarm(self):
         while True:
