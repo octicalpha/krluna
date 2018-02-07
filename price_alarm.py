@@ -11,6 +11,12 @@ import os
 import time
 from util import slack, cur_ms, avg, fix_float_radix, run_cmd
 from concurrent.futures import ThreadPoolExecutor
+from threading import Thread
+
+def run_thread(fn, args=()):
+    t = Thread(target=fn, args=args)
+    t.daemon = True
+    t.start()
 
 
 class PriceAlarm(object):
@@ -19,15 +25,16 @@ class PriceAlarm(object):
         self.exchange = Okex(config['apikey']['okex']['key'], config['apikey']['okex']['secret'])
         self.engine = MysqlEngine(config['db']['url'])
         self.symbols = None
+        self.init_db()
+
         self.refresh_db_config()
 
         self.pool = ThreadPoolExecutor(4)
-        self.pool.submit(self.sched_refresh_db_config, ())
-        self.pool.submit(self.reset_success_alarm, ())
+        run_thread(self.sched_refresh_db_config)
+        run_thread(self.reset_success_alarm)
 
         self.success_alarm = False
 
-        self.init_db()
 
     def init_db(self):
         sql = """
@@ -43,6 +50,7 @@ class PriceAlarm(object):
           UNIQUE KEY `ukey__exchange_symbol` (`exchange`,`symbol`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8
         """
+        self.engine.execute(sql, ())
 
     def refresh_db_config(self):
         sql = "select * from price_monitor_symbols where status = 1"
@@ -52,14 +60,15 @@ class PriceAlarm(object):
         while True:
             try:
                 self.refresh_db_config()
+                logging.info("refresh %s" % self.symbols)
             except:
                 logging.error("refresh error")
-            time.sleep(1 * 60)
+            time.sleep(60)
 
     def reset_success_alarm(self):
         while True:
             self.success_alarm = False
-            time.sleep(5 * 60)
+            time.sleep(3 * 60)
 
     def run(self):
         if not self.symbols:
