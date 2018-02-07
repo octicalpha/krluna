@@ -1,6 +1,7 @@
 # coding: utf8
 
 import os
+import subprocess
 import heapq
 import arrow
 import time
@@ -59,3 +60,12 @@ def slack(msg):
         requests.post(url, data=json.dumps(data))
 
     threading.Thread(target=_inner, args=(msg,)).start()
+
+
+def run_cmd(cmd):
+    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    res = ''
+    for line in p.stdout.readlines():
+        res += line
+    retval = p.wait()
+    return res

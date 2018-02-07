@@ -54,6 +54,7 @@ class Okex(Exchange):
         params['api_key'] = self.api_key
         params['sign'] = self.sign(params)
         res = self.post(endpoint, params)
+        print res
         return self._parse_account(res)
 
     def _parse_account(self, acc):
@@ -94,7 +95,27 @@ class Okex(Exchange):
         try:
             return res['order_id']
         except:
-            raise Exception("okex order error: " + res)
+            raise Exception("okex order error: %s " % res)
+
+    def batch_order(self, symbol, side, orders_data=[]):
+        if not orders:
+            return
+        endpoint = '/api/v1/batch_trade.do'
+        params = {
+            'api_key': self.api_key,
+            'symbol': symbol,
+            'type': side,
+            "orders_data": json.dumps(orders_data),
+        }
+
+        params['sign'] = self.sign(params)
+        res = self.post(endpoint, params)
+        print res
+        try:
+            order_info = res['order_info']
+            return [x['order_id'] for x in order_info]
+        except:
+            raise Exception("okex batch order error: %s" % res)
 
     def cancel_order(self, symbol, order_id):
         endpoint = "/api/v1/cancel_order.do"
@@ -138,9 +159,22 @@ class Okex(Exchange):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    api = Okex()
+    import os, sys
+
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+    from util import read_conf
+
+    conf = read_conf(os.path.join(os.path.dirname(__file__), "../config.json"))
+    api = Okex(conf['apikey']['okex']['key'], conf['apikey']['okex']['secret'])
     # a = api.fetch_ticker('eth_usdt')
-    print api.fetch_kline("btc_usdt")
+    # print api.fetch_kline("btc_usdt")
+    # print api.account()
+    orders = [
+        {"price": 7000, "amount": 0.001},
+        {"price": 7500, "amount": 0.001}
+    ]
+    print api.batch_order("btc_usdt", "buy", orders_data=orders)
+    # api.batch_order()
     # print api.fetch_depth('eth_usdt')
     # print api.account()
     # print api.order('eth_usdt', 'buy', 'limit', 0.1, 10)

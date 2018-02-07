@@ -4,7 +4,7 @@ import re
 from slackclient import SlackClient
 import subprocess
 
-from util import read_conf
+from util import read_conf, run_cmd
 
 conf = read_conf("./config.json")
 # instantiate Slack client
@@ -16,15 +16,6 @@ starterbot_id = None
 RTM_READ_DELAY = 1  # 1 second delay between reading from RTM
 EXAMPLE_COMMAND = "do"
 MENTION_REGEX = "^<@(|[WU].+)>(.*)"
-
-
-def run_cmd(cmd):
-    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    res = ''
-    for line in p.stdout.readlines():
-        res += line
-    retval = p.wait()
-    return res
 
 
 def parse_bot_commands(slack_events):
@@ -55,6 +46,12 @@ def handle_command(command, channel):
     if command.startswith(EXAMPLE_COMMAND):
         response = "Sure...write some more code then I can do that!"
 
+    cmd = command.split()
+    args = []
+    if len(cmd) != 0:
+        command = cmd[0]
+        args = cmd[1:]
+
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
     if command == 'restart':
         response = run_cmd("supervisorctl restart chopper_spider")
@@ -64,6 +61,12 @@ def handle_command(command, channel):
         response = run_cmd("python tools.py benefit")
     if command in ('unfinish', 'unfinished'):
         response = run_cmd("python tools.py unfinish")
+    if command in ('apm', 'add_price_monitor'):
+        response = run_cmd("python tools.py add_price_monitor --low %s --high %s" % (args[0], args[1]))
+    if command in ('rpm', 'remove_price_monitor'):
+        response = run_cmd("python tools.py remove_price_monitor")
+    if command in ('spm', 'show_price_monitor'):
+        response = run_cmd("python tools.py show_price_monitor")
 
     # Sends the response back to the channel
     slack_client.api_call(

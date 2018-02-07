@@ -82,9 +82,11 @@ class TaStrategy(BackTestMixin):
     def back_test(self):
         self.in_backtest = True
         self.bt_min_round_benefit = -60
-        data = self.okex_exchange.fetch_kline(self.symbol, type="1min", size=1000)
-        # graph(data)
-        # return
+        data = self.okex_exchange.fetch_kline(self.symbol, type="3min", size=1000)
+        data['MACD'], data['MACDsignal'], data['MACDhist'] = talib.MACD(data['close'].values,
+                                                                        fastperiod=5, slowperiod=34, signalperiod=5)
+        graph(data)
+        return
         l = len(data)
         for i in range(400, l):
             self.record = data.iloc[0: i + 1, :]
@@ -126,8 +128,8 @@ class TaStrategy(BackTestMixin):
         #     else:
         #         self.cmp_buy_price_cnt = [0, 0]
 
-        # data['RSI6'] = talib.RSI(data['close'].values, timeperiod=6)
-        # data['RSI20'] = talib.RSI(data['close'].values, timeperiod=20)
+        data['RSI6'] = talib.RSI(data['close'].values, timeperiod=6)
+        data['RSI20'] = talib.RSI(data['close'].values, timeperiod=20)
         # data['EMA30'] = talib.EMA(data['close'].values, timeperiod=30)
         # data['MACD'], data['MACDsignal'], data['MACDhist'] = talib.MACD(data['close'].values)
         data['MACD'], data['MACDsignal'], data['MACDhist'] = talib.MACD(data['close'].values,
@@ -145,27 +147,18 @@ class TaStrategy(BackTestMixin):
         steep = 5.4
         small = 1.8
 
+
         sl1 = one - zero
         sl2 = two - one
         sl3 = row - two
+        steep = 11
+        small = 5
         if row > 0:
-            if cur_row['MACD'] < -5:
-                steep = 17
-                small = 7
-            else:
-                steep = 11
-                small = 5
             if sl3 > steep:
                 gold_cross = True
             elif sl3 > small and sl2 > small and two > 0:
                 gold_cross = True
         if row < 0:
-            if cur_row['MACD'] > 5:
-                steep = 17
-                small = 7
-            else:
-                steep = 11
-                small = 5
             if sl3 < -steep:
                 dead_cross = True
             if sl3 < -small and sl2 < -small and two < 0:
@@ -173,24 +166,30 @@ class TaStrategy(BackTestMixin):
 
         msg = (zero, one, two, row, sl1, sl2, sl3)
         if gold_cross:
-            logging.info("find gold cross, %s, %s", data.index[-1], msg)
-            if self.in_backtest:
-                buy_price = cur_row['high'] + 10
-                self.back_test_buy(buy_price, msg=data.index[-1])
+            if not (cur_row['RSI6'] > 55 or cur_row['RSI20'] > 50):
+                logging.info("find gold cross, but rsi not match %s, %s, %s, %s", data.index[-1], msg, cur_row['RSI6'], cur_row['RSI20'])
             else:
-                role = 'taker' if sl3 > steep else 'maker'
-                self.buy(self.amount, role)
+                logging.info("find gold cross, %s, %s", data.index[-1], msg)
+                if self.in_backtest:
+                    buy_price = cur_row['high'] + 10
+                    self.back_test_buy(buy_price, msg=data.index[-1])
+                else:
+                    role = 'taker' if sl3 > steep else 'maker'
+                    self.buy(self.amount, role)
 
         if dead_cross:
-            logging.info("find dead cross, %s, %s", data.index[-1], msg)
-            if self.in_backtest:
-                sell_price = cur_row['low']
-                self.back_test_try_cancel_buy_order()
-                self.back_test_sell(sell_price, msg=data.index[-1])
+            if not (cur_row['RSI6'] < 40 or cur_row['RSI20'] < 40):
+                logging.info("find gold cross, but rsi not match %s, %s, %s, %s", data.index[-1], msg, cur_row['RSI6'], cur_row['RSI20'])
             else:
-                self.try_cancel_buy_order()
-                role = 'taker' if sl3 < -steep else 'maker'
-                self.sell(role=role)
+                logging.info("find dead cross, %s, %s", data.index[-1], msg)
+                if self.in_backtest:
+                    sell_price = cur_row['low']
+                    self.back_test_try_cancel_buy_order()
+                    self.back_test_sell(sell_price, msg=data.index[-1])
+                else:
+                    self.try_cancel_buy_order()
+                    role = 'taker' if sl3 < -steep else 'maker'
+                    self.sell(role=role)
 
     def try_cancel_buy_order(self):
         if self.prod_status != BtStatus.PLACE_BUY_ORDER:  # 有未成交买单是处理

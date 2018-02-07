@@ -74,6 +74,25 @@ class Tool(object):
             res.append(s)
         return '\n'.join(res)
 
+    def add_price_monitor(self, low, high, symbol="btc_usdt", ex="okex"):
+        sql = "insert into price_monitor_symbols (exchange, symbol, low, high, status) values (?, ?, ? ,?, ?) on duplicate key update low=?, high=?"
+        self.engine.execute(sql, (ex, symbol, low, high, 1, low, high))
+        return True
+
+    def remove_price_monitor(self, symbol="btc_usdt", ex="okex"):
+        sql = "update price_monitor_symbols set status=0 where ex=? and symbol=?"
+        self.engine.execute(sql, (ex, symbol))
+        return True
+
+    def show_price_monitor(self):
+        sql = "select * from price_monitor_symbols where status = 1"
+        data = self.engine.execute(sql, ())
+        res = []
+        for x in data:
+            s = "%s\t%s\t%s\t%s" % (x.exchange, x.symbol, fix_float_radix(x.low, 2), fix_float_radix(x.high, 2))
+            res.append(s)
+        return ' '.join(res)
+
 
 tool = Tool(read_conf("./config.json"))
 
@@ -107,12 +126,37 @@ def unfinish():
 def cancel_order(id, symbol, ex):
     tool.cancel_order(ex, id, symbol)
 
+
 @cli.command()
 @click.option("--id")
 @click.option("--symbol", default="btc_usdt")
 @click.option("--ex")
 def order_info(id, symbol, ex):
     tool.order_info(ex, id, symbol)
+
+
+@cli.command()
+@click.option("--low")
+@click.option("--high")
+@click.option("--symbol", default="btc_usdt")
+@click.option("--ex", default="okex")
+def add_price_monitor(low, high, symbol, ex):
+    tool.add_price_monitor(low, high, symbol, ex)
+    print tool.show_price_monitor()
+
+
+@cli.command()
+@click.option("--symbol", default="btc_usdt")
+@click.option("--ex", default="okex")
+def remove_price_monitor(symbol, ex):
+    tool.remove_price_monitor(symbol, ex)
+    print tool.show_price_monitor()
+
+
+@cli.command()
+def show_price_monitor():
+    print tool.show_price_monitor()
+
 
 if __name__ == '__main__':
     cli()
